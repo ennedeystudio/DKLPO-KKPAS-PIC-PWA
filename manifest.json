@@ -1,8 +1,10 @@
 {
+  "id": "/",
   "name": "KKPAS PIC",
   "short_name": "KKPAS PIC",
   "description": "Portal PIC DKLPO Safety Inspection",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#090d16",
@@ -11,17 +13,20 @@
     {
       "src": "https://arleta.site/interactivelink/3333/DKLPO_Master_192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "https://arleta.site/interactivelink/3333/DKLPO_Master_512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "https://arleta.site/interactivelink/3333/DKLPO_Master_1024.png",
       "sizes": "1024x1024",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
