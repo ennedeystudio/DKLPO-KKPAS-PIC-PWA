@@ -1405,6 +1405,11 @@ function decodeLegacyText(s) {
   }
 }
 
+function newSubmissionId_() {
+  try { if (crypto && typeof crypto.randomUUID === 'function') return 'SUB-' + crypto.randomUUID(); } catch (_) {}
+  return 'SUB-' + Date.now() + '-' + Math.random().toString(36).slice(2,12);
+}
+
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -2688,9 +2693,10 @@ async function submitRectification() {
   const f = currentFinding;
   if (!f) return;
 
-  const action = $('rectAction').value.trim();
+  const actionText = $('rectAction').value.trim(); // DITUKAR: Guna actionText
   const rootCause = $('rectRootCause').value.trim();
-  if (!action) {
+  
+  if (!actionText) {
     showToast(t('Medan Wajib', 'Required Field'), t('Sila isi keterangan tindakan pembetulan.', 'Please enter corrective action details.'), 'error');
     return;
   }
@@ -2708,7 +2714,7 @@ async function submitRectification() {
 
   // If device is offline, queue directly
   if (!navigator.onLine) {
-    queueSubmissionOffline(f, action, rootCause, ready);
+    queueSubmissionOffline(f, actionText, rootCause, ready); // DITUKAR: Guna actionText
     showToast(
       t('Disimpan Dalam Barisan Offline', 'Saved to Offline Queue'),
       t('Tiada internet. Bukti pembetulan akan dihantar secara automatik apabila talian pulih.', 'No internet. Rectification will sync automatically when back online.'),
@@ -2745,12 +2751,12 @@ async function submitRectification() {
     if (!uploaded.length) throw new Error(t('Tiada gambar berjaya dimuat naik.', 'No photos uploaded successfully.'));
 
     const res = await api({
-      action: 'submitPICRectification',
+      action: 'submitPICRectification', // KEKAL: Arahan router backend
       findingId: f.findingId,
       picId: selectedPic.picId,
       picName: selectedPic.name,
-      action,
-      rootCause,
+      rectificationAction: actionText,  // DITUKAR: Guna key baharu dan nilai actionText
+      rootCause: rootCause,
       photos: uploaded,
       deviceId: getDeviceId()
     });
@@ -2771,7 +2777,7 @@ async function submitRectification() {
   } catch (err) {
     hideLoading();
     // Offer offline queue fallback if network dropped mid-upload
-    queueSubmissionOffline(f, action, rootCause, ready);
+    queueSubmissionOffline(f, actionText, rootCause, ready); // DITUKAR: Guna actionText
     showToast(
       t('Disimpan ke Barisan Offline', 'Queued for Retry'),
       String(err.message || err) + ' — ' + t('Data disimpan & boleh di-sync semula.', 'Saved to offline queue for retry.'),
