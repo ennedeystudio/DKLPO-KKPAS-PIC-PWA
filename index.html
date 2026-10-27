@@ -1111,15 +1111,41 @@ textarea { resize: vertical; min-height: 88px; }
   font-size: 20px;
 }
 .img-viewer .cap { color: #eee; font-size: 13px; margin-top: 12px; text-align: center; max-width: 88%; }
+/* ============ KKPAS INSTALL GATE ============ */
+.kkpas-install-gate { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(5, 8, 15, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.kkpas-install-gate.show { display: flex; animation: fadeIn 0.3s ease-out; }
+.kkpas-install-card { width: 100%; max-width: 440px; background: var(--surface); color: var(--text); border: 1px solid var(--stroke-strong); border-radius: 24px; padding: 28px 22px; box-shadow: 0 24px 80px rgba(0,0,0,0.6); text-align: center; }
+.kkpas-install-icon { width: 84px; height: 84px; border-radius: 22px; display: block; margin: 0 auto 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); background: #090d16; border: 1px solid var(--stroke-strong); }
+.kkpas-install-card h2 { margin: 0 0 8px; font-size: 21px; font-weight: 800; letter-spacing: -0.3px; }
+.kkpas-install-card p { margin: 0 0 18px; line-height: 1.5; color: var(--muted); font-size: 13px; }
+.kkpas-install-steps { text-align: left; margin: 16px 0 20px; padding: 14px 16px; border: 1px solid var(--stroke-strong); background: var(--surface-elevated); border-radius: 16px; line-height: 1.6; font-size: 13px; display: none; }
+.kkpas-install-primary { width: 100%; border: 0; border-radius: 12px; padding: 14px 16px; font-size: 15px; font-weight: 800; cursor: pointer; background: var(--brand); color: #fff; margin-bottom: 12px; transition: 0.2s; }
+.kkpas-install-primary:active { transform: scale(0.97); }
+.kkpas-install-secondary { width: 100%; background: transparent; color: var(--text); border: 1px solid var(--stroke-strong); border-radius: 12px; padding: 14px 16px; font-size: 14px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+.kkpas-install-secondary:active { transform: scale(0.97); background: var(--surface-elevated); }
+.kkpas-install-note { font-size: 11px !important; margin-top: 16px !important; opacity: 0.7; }
 </style>
 </head>
 <body>
-
+<!-- ============ KKPAS INSTALL GATE ============ -->
+<div id="kkpasInstallGate" class="kkpas-install-gate" role="dialog" aria-modal="true">
+  <div class="kkpas-install-card">
+    <img class="kkpas-install-icon" src="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png" alt="DKLPO">
+    <h2 data-ms="Pasang Aplikasi PIC" data-en="Install PIC Portal">Pasang Aplikasi PIC</h2>
+    <p data-ms="Untuk penggunaan yang lebih lancar dan pantas, sila pasang portal ini ke peranti anda." data-en="For smoother and faster usage, please install this portal to your device.">Untuk penggunaan yang lebih lancar dan pantas, sila pasang portal ini ke peranti anda.</p>
+    
+    <div id="kkpasInstallSteps" class="kkpas-install-steps"></div>
+    
+    <button id="kkpasInstallBtn" class="kkpas-install-primary" type="button">Install Aplikasi</button>
+    <button id="kkpasContinueBtn" class="kkpas-install-secondary" type="button">Teruskan di Browser</button>
+    
+    <p class="kkpas-install-note" data-ms="Pemasangan aplikasi memerlukan pengesahan dari Android/iOS." data-en="App installation requires permission from Android/iOS.">Pemasangan aplikasi memerlukan pengesahan dari Android/iOS.</p>
+  </div>
+</div>
 <!-- ============ LOGIN SCREEN ============ -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px;">
-      <button id="btnPWAInstallLogin" class="btn small primary" style="display:none;">📲 Pasang App</button>
       <button class="icon-btn" onclick="toggleTheme()" id="btnThemeLogin" title="Tukar Tema">🌙</button>
       <button class="icon-btn" onclick="toggleLang()" id="btnLangLogin" title="Tukar Bahasa">BM</button>
     </div>
@@ -1165,8 +1191,6 @@ textarea { resize: vertical; min-height: 88px; }
       </div>
     </div>
     
-    <button id="btnPWAInstall" class="btn small primary" style="display:none; margin-right:4px;">📲 Pasang</button>
-
     <button class="icon-btn" onclick="toggleTheme()" id="btnTheme" title="Tukar Tema">🌙</button>
     <button class="icon-btn" onclick="toggleLang()" id="btnLang" title="Bahasa">BM</button>
     <button class="icon-btn" onclick="refreshAll()" id="btnRefresh" title="Segar Semula">🔄</button>
@@ -2800,49 +2824,91 @@ async function submitRectification() {
   }
 </script>
 <script>
-  let deferredPrompt = null;
-  // Dapatkan elemen butang pemasangan (sokong kedua-dua lokasi jika ada)
-  const installBtnTop = document.getElementById('btnPWAInstall');
-  const installBtnLogin = document.getElementById('btnPWAInstallLogin');
+(() => {
+  let deferredInstallPrompt = null;
 
-  function showInstallButtons() {
-    if (installBtnTop) installBtnTop.style.display = 'inline-flex';
-    if (installBtnLogin) installBtnLogin.style.display = 'inline-flex';
-  }
+  // Semak jenis peranti & jika ia sudah dipasang (standalone)
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
-  function hideInstallButtons() {
-    if (installBtnTop) installBtnTop.style.display = 'none';
-    if (installBtnLogin) installBtnLogin.style.display = 'none';
-  }
+  const gate = document.getElementById('kkpasInstallGate');
+  const btn = document.getElementById('kkpasInstallBtn');
+  const continueBtn = document.getElementById('kkpasContinueBtn');
+  const text = document.querySelector('#kkpasInstallGate p');
+  const steps = document.getElementById('kkpasInstallSteps');
 
-  // Chrome akan mencetuskan event ini apabila PWA sedia dipasang
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); // Halang pop-up lalai Chrome
-    deferredPrompt = e;
-    showInstallButtons();
-  });
+  function showGate() {
+    if (!gate || isStandalone) return;
+    gate.classList.add('show');
 
-  // Fungsi apabila butang ditekan
-  async function handleInstallClick() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      console.log('Pengguna bersetuju memasang PWA');
+    if (isIOS) {
+      text.textContent = currentLang === 'ms' ? 'Pada iPhone/iPad, pemasangan dibuat melalui Safari.' : 'On iPhone/iPad, installation is done via Safari.';
+      steps.style.display = 'block';
+      steps.innerHTML = '<strong>Cara pasang / How to install:</strong><br>1. Buka pautan ini di <strong>Safari</strong>.<br>2. Tekan ikon <strong>Share</strong> (petak dengan anak panah).<br>3. Pilih <strong>Add to Home Screen</strong>.<br>4. Tekan <strong>Add</strong>.';
+      btn.textContent = currentLang === 'ms' ? 'Saya Faham' : 'I Understand';
+    } else if (isAndroid) {
+      btn.textContent = deferredInstallPrompt ? (currentLang === 'ms' ? 'Install Aplikasi' : 'Install App') : (currentLang === 'ms' ? 'Cara Install' : 'How to Install');
     }
-    deferredPrompt = null;
-    hideInstallButtons();
   }
 
-  if (installBtnTop) installBtnTop.addEventListener('click', handleInstallClick);
-  if (installBtnLogin) installBtnLogin.addEventListener('click', handleInstallClick);
+  function hideGate() {
+    if (gate) gate.classList.remove('show');
+  }
 
-  // Sembunyikan butang setelah aplikasi berjaya dipasang
-  window.addEventListener('appinstalled', () => {
-    hideInstallButtons();
-    deferredPrompt = null;
-    console.log('PWA berjaya dipasang.');
+  // Dengar event PWA dari Chrome
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    if (!isStandalone) showGate();
   });
+
+  // Apabila berjaya dipasang
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    hideGate();
+  });
+
+  // Fungsi butang Install
+  btn?.addEventListener('click', async () => {
+    if (isIOS) {
+      hideGate();
+      return;
+    }
+
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          hideGate();
+        } else {
+          showGate();
+        }
+      } catch (err) {
+        console.warn('PWA Install failed:', err);
+      } finally {
+        deferredInstallPrompt = null;
+      }
+      return;
+    }
+
+    // Jika prompt tiada, tunjuk panduan manual
+    steps.style.display = 'block';
+    steps.innerHTML = currentLang === 'ms' 
+      ? '<strong>Sila gunakan menu browser (⋮)</strong><br>Pilih pilihan <strong>Install app</strong> atau <strong>Add to Home screen</strong>.'
+      : '<strong>Please use the browser menu (⋮)</strong><br>Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.';
+  });
+
+  continueBtn?.addEventListener('click', hideGate);
+
+  // Paparkan skrin secara automatik 0.8 saat selepas aplikasi dibuka di browser biasa
+  window.addEventListener('load', () => {
+    if (!isStandalone) {
+      setTimeout(showGate, 800);
+    }
+  });
+})();
 </script>
 </body>
 </html>
