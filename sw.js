@@ -1,43 +1,32 @@
-const CACHE_NAME = 'kkpas-pic-cache-v1';
+const CACHE_NAME = 'kkpas-pic-cache-v2';
 const urlsToCache = [
   './',
   './index.html',
-  './manifest.json',
-  'https://arleta.site/interactivelink/3333/DKLPO_Master_192.png',
-  'https://arleta.site/interactivelink/3333/DKLPO_Master_512.png'
+  './manifest.json'
 ];
 
-// Pasang Service Worker dan cache fail utama
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
-  );
-});
-
-// Guna Network-First strategy (ambil dari internet dulu, kalau tiada internet ambil dari cache)
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(urlsToCache);
     })
   );
 });
 
-// Buang cache lama apabila ada versi baharu
 self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then(keys => Promise.all(
+      keys.map(k => {
+        if (k !== CACHE_NAME) return caches.delete(k);
+      })
+    )).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
