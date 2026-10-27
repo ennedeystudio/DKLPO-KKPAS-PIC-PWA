@@ -1119,6 +1119,7 @@ textarea { resize: vertical; min-height: 88px; }
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px;">
+      <button id="btnPWAInstallLogin" class="btn small primary" style="display:none;">📲 Pasang App</button>
       <button class="icon-btn" onclick="toggleTheme()" id="btnThemeLogin" title="Tukar Tema">🌙</button>
       <button class="icon-btn" onclick="toggleLang()" id="btnLangLogin" title="Tukar Bahasa">BM</button>
     </div>
@@ -1157,12 +1158,15 @@ textarea { resize: vertical; min-height: 88px; }
 <div id="mainApp">
   <div class="topbar">
     <img class="logo" src="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png" alt="DKLPO"/>
-    <div class="brand">
+ <div class="brand">
       <div class="title" id="hdrName">—</div>
       <div class="sub">
         <span id="hdrStation">—</span>
       </div>
     </div>
+    
+    <button id="btnPWAInstall" class="btn small primary" style="display:none; margin-right:4px;">📲 Pasang</button>
+
     <button class="icon-btn" onclick="toggleTheme()" id="btnTheme" title="Tukar Tema">🌙</button>
     <button class="icon-btn" onclick="toggleLang()" id="btnLang" title="Bahasa">BM</button>
     <button class="icon-btn" onclick="refreshAll()" id="btnRefresh" title="Segar Semula">🔄</button>
@@ -2794,6 +2798,51 @@ async function submitRectification() {
         });
     });
   }
+</script>
+<script>
+  let deferredPrompt = null;
+  // Dapatkan elemen butang pemasangan (sokong kedua-dua lokasi jika ada)
+  const installBtnTop = document.getElementById('btnPWAInstall');
+  const installBtnLogin = document.getElementById('btnPWAInstallLogin');
+
+  function showInstallButtons() {
+    if (installBtnTop) installBtnTop.style.display = 'inline-flex';
+    if (installBtnLogin) installBtnLogin.style.display = 'inline-flex';
+  }
+
+  function hideInstallButtons() {
+    if (installBtnTop) installBtnTop.style.display = 'none';
+    if (installBtnLogin) installBtnLogin.style.display = 'none';
+  }
+
+  // Chrome akan mencetuskan event ini apabila PWA sedia dipasang
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // Halang pop-up lalai Chrome
+    deferredPrompt = e;
+    showInstallButtons();
+  });
+
+  // Fungsi apabila butang ditekan
+  async function handleInstallClick() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('Pengguna bersetuju memasang PWA');
+    }
+    deferredPrompt = null;
+    hideInstallButtons();
+  }
+
+  if (installBtnTop) installBtnTop.addEventListener('click', handleInstallClick);
+  if (installBtnLogin) installBtnLogin.addEventListener('click', handleInstallClick);
+
+  // Sembunyikan butang setelah aplikasi berjaya dipasang
+  window.addEventListener('appinstalled', () => {
+    hideInstallButtons();
+    deferredPrompt = null;
+    console.log('PWA berjaya dipasang.');
+  });
 </script>
 </body>
 </html>
