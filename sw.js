@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kkpas-pic-cache-v2';
+const CACHE_NAME = 'kkpas-pic-cache-v3-indexeddb-20261029';
 const urlsToCache = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
       keys.map(k => {
-        if (k !== CACHE_NAME) return caches.delete(k);
+        if (k.startsWith('kkpas-pic-cache-') && k !== CACHE_NAME) return caches.delete(k);
       })
     )).then(() => self.clients.claim())
   );
