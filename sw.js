@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kkpas-pic-cache-v8-20261029';
+const CACHE_NAME = 'kkpas-pic-cache-v11-cors-20261029';
 const CORE = ['./', './index.html', './manifest.json'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(CORE)).then(()=>self.skipWaiting()));
