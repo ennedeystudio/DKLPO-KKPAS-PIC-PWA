@@ -1870,13 +1870,6 @@ function updateSharedStationBanner_() {
     el.textContent = t('Tiada stesen didaftarkan. Minta Admin kemas kini profil PIC anda.', 'No station is registered. Ask Admin to update your PIC profile.');
     return;
   }
-  const shared = allFindings.filter(f => canAssistFinding_(f, selectedPic) &&
-    String(f.picId || '').trim() && String(f.picId || '').trim() !== String(selectedPic.picId || '').trim());
-  el.style.display = 'block';
-  el.textContent = '🤝 ' + t('Tugasan bersama stesen', 'Shared station tasks') + ': ' +
-    stations.join(', ') + '. ' + t('PIC aktif bagi stesen ini boleh menghantar bukti, walaupun laporan ditugaskan kepada PIC utama yang lain. Rekod Admin kekal menyimpan PIC utama dan nama penghantar sebenar.',
-    'Active PICs at this station may submit evidence even if a different primary PIC is assigned. The primary assignee and actual submitter are recorded separately.') +
-    ' ' + shared.length + ' ' + t('tugasan ditugaskan kepada PIC lain dalam senarai anda.', 'listed tasks have another primary PIC.');
 }
 
 async function refreshAll(options = {}) {
