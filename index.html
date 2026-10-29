@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="referrer" content="no-referrer"/>
 <meta name="theme-color" content="#090d16"/>
 <title>DKLPO · Portal PIC v2.1 — Stesen Bersama</title>
 <link rel="icon" type="image/png" href="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png"/>
@@ -818,6 +819,10 @@ img { max-width: 100%; display: block; }
 }
 .info-item .v { font-size: 13px; font-weight: 700; word-break: break-word; }
 
+/* Captions are kept with each evidence entry in IndexedDB. */
+.photo-entry { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.photo-caption { width:100%;min-width:0;box-sizing:border-box;border-radius:8px;border:1px solid var(--stroke-strong);
+  padding:7px 6px;background:var(--bg);color:var(--text);font:inherit;font-size:11px; }
 /* Photo Grid & Annotation Trigger */
 .photo-grid {
   display: grid;
@@ -1124,6 +1129,23 @@ textarea { resize: vertical; min-height: 88px; }
 .kkpas-install-secondary { width: 100%; background: transparent; color: var(--text); border: 1px solid var(--stroke-strong); border-radius: 12px; padding: 14px 16px; font-size: 14px; font-weight: 700; cursor: pointer; transition: 0.2s; }
 .kkpas-install-secondary:active { transform: scale(0.97); background: var(--surface-elevated); }
 .kkpas-install-note { font-size: 11px !important; margin-top: 16px !important; opacity: 0.7; }
+
+
+/* PIC V5 — collaboration panel and ergonomic mobile actions */
+.pic-help-panel{margin:14px 0 16px;border:1px solid var(--stroke-strong);background:var(--surface);border-radius:16px;padding:14px}
+.pic-help-panel h3{margin:0 0 8px;font-size:14px}
+.pic-help-row{padding:12px 0;border-bottom:1px solid var(--stroke);font-size:12px}
+.pic-help-row:last-child{border-bottom:0}
+.pic-help-row .info{color:var(--muted);font-size:11px;margin-top:4px}
+.pic-help-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.pic-help-actions button{flex:1;min-width:100px}
+.pic-help-label{display:inline-block;color:var(--brand);font-weight:800;font-size:11px;margin-bottom:6px}
+.pic-help-warning{color:var(--warn);font-size:12px;padding:7px 0}
+.pic-help-modal .modal-box{max-width:540px}
+.pic-help-modal textarea,.pic-help-modal select{width:100%;min-height:44px}
+.pic-help-modal textarea{min-height:110px}
+@media(max-width:500px){.pic-help-actions button{min-height:46px}.pic-help-panel{margin:12px 0}}
+
 </style>
 </head>
 <body>
@@ -1235,6 +1257,14 @@ textarea { resize: vertical; min-height: 88px; }
       <div id="stationFilterBar" class="filter-bar"></div>
     </div>
 
+    <!-- PIC collaboration: receives requests and shows outbound assistance without Admin approval -->
+    <section id="picHelpPanel" class="pic-help-panel" aria-live="polite" style="display:none;">
+      <h3>🤝 <span data-ms="Kerjasama PIC" data-en="PIC Collaboration">Kerjasama PIC</span></h3>
+      <div id="picHelpSummary" class="helper">Memuatkan permohonan bantuan...</div>
+      <div id="picHelpItems"></div>
+      <button class="btn small" type="button" onclick="refreshPICHelp_(true)">↻ Semak bantuan</button>
+    </section>
+
 <!-- Search Input -->
     <div class="task-search-wrap">
       <span class="s-ico">🔍</span>
@@ -1280,6 +1310,44 @@ textarea { resize: vertical; min-height: 88px; }
       <button class="modal-close" onclick="closeDetail()">✕</button>
     </div>
     <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- PIC V8: choose assistance within existing PIC login; no PIN or additional portal. -->
+<div class="modal pic-help-modal" id="picHelpModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div><h2 id="picHelpModalTitle">Mohon Bantuan PIC</h2><div class="sub" id="picHelpModalSubtitle"></div></div>
+      <button class="modal-close" type="button" onclick="closePICHelpModal_()">✕</button>
+    </div>
+    <form id="picHelpForm" onsubmit="submitPICHelpForm_(event)">
+      <div class="form-group">
+        <label for="picHelpKind">Jenis permohonan</label>
+        <select class="select" id="picHelpKind">
+          <option value="HELP">Mohon bantuan kepakaran / tenaga kerja</option>
+          <option value="UNABLE">Tidak dapat melaksanakan — mohon PIC lain</option>
+        </select>
+      </div>
+      <div class="form-group"><label for="picHelpTarget">PIC bantuan (boleh dari stesen lain)</label>
+        <select class="select" id="picHelpTarget" required></select>
+      </div>
+      <div class="form-group"><label for="picHelpReason">Sebab & skop bantuan (wajib)</label>
+        <textarea id="picHelpReason" required minlength="12" maxlength="700" placeholder="Contoh: Pendawaian di Grading memerlukan personel elektrik kompeten. Sila periksa dan baiki jika selamat."></textarea>
+      </div>
+      <div class="banner warn">Isu kekal pada PIC asal. PIC bantuan mesti menerima permohonan sebelum boleh menghantar bukti. Kerja berisiko hanya oleh pekerja kompeten yang diberi kuasa.</div>
+      <button class="btn primary block" type="submit" id="picHelpSendButton">🤝 Hantar permohonan</button>
+    </form>
+  </div>
+</div>
+<div class="modal pic-help-modal" id="picHelpResponseModal">
+  <div class="modal-box">
+    <div class="modal-header"><h2 id="picHelpResponseTitle">Jawab Permohonan</h2><button class="modal-close" onclick="closePICHelpResponseModal_()">✕</button></div>
+    <div id="picHelpResponseInfo" class="banner info"></div>
+    <div class="form-group" id="picHelpDeclineWrap" style="display:none">
+      <label for="picHelpDeclineReason">Sebab tidak dapat membantu (wajib)</label>
+      <textarea id="picHelpDeclineReason" minlength="8" maxlength="700" placeholder="Nyatakan sebab yang jelas..."></textarea>
+    </div>
+    <div class="pic-help-actions" id="picHelpResponseButtons"></div>
   </div>
 </div>
 
@@ -1360,7 +1428,7 @@ textarea { resize: vertical; min-height: 88px; }
 /* =========================================================
    DKLPO PIC PORTAL — v2.0 (Modern UI + Offline + Filter + Markup + Timeline)
    ========================================================= */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwHTRO_asLzBFhKwnolGE5egZ0zD3bHust69dROJMLJrwZw-gHNhNQm8u3IK_CbL5bj/exec";
+const WEB_APP_URL = "https://script.google.com/macros/library/d/12I6kRbRdBGVWnZWFbXgoXCnFs7TsKqACBGCOMNFQes4Ajt330-D0w8OY/28";
 
 const STORE_PIC_ID = 'dklpo_pic_id';
 const STORE_PIC_NAME = 'dklpo_pic_name';
@@ -1373,6 +1441,9 @@ const STORE_DIR_CACHE = 'dklpo_pic_dir_cache_v2';
 const STORE_FINDINGS_CACHE_PREFIX = 'dklpo_pic_findings_cache_v2_';
 const STORE_DRAFT_PREFIX = 'dklpo_pic_draft_v2_';
 const STORE_OFFLINE_QUEUE = 'dklpo_pic_offline_queue_v2';
+
+
+/* V6: Portal PIC asal sahaja. Tiada PIN, pautan khas atau portal tambahan. */
 
 const MAX_PHOTOS = 12;
 const COMPRESS_MAX_DIM = 1600;
@@ -1416,6 +1487,95 @@ function esc(s) {
 }
 
 function t(ms, en) { return currentLang === 'ms' ? ms : en; }
+
+/* ============ PIC V3 — IndexedDB durable evidence storage ============
+   Keeping legacy keys read-only for migration; browser never deletes old evidence automatically. */
+const PIC_IDB_NAME = 'dklpo_pic_evidence_v3';
+const PIC_QUEUE_INDEX = 'dklpo_pic_queue_index_v3';
+const PIC_DRAFT_INDEX = 'dklpo_pic_draft_index_v3_';
+let picStoreDbPromise_ = null;
+let picDraftGeneration_ = 0;
+const picDraftWrites_ = new Map();
+function picDb_() {
+  if (!('indexedDB' in window)) return Promise.reject(new Error('IndexedDB tidak tersedia'));
+  if (!picStoreDbPromise_) picStoreDbPromise_ = new Promise((resolve,reject) => {
+    const req = indexedDB.open(PIC_IDB_NAME,1);
+    req.onupgradeneeded = () => {
+      const db=req.result;
+      if (!db.objectStoreNames.contains('drafts')) db.createObjectStore('drafts');
+      if (!db.objectStoreNames.contains('queues')) db.createObjectStore('queues');
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error || Error('IndexedDB open failed'));
+    req.onblocked=()=>reject(Error('IndexedDB upgrade blocked'));
+  }).catch(e=>{picStoreDbPromise_=null;throw e;});
+  return picStoreDbPromise_;
+}
+async function picDbGet_(store,key) {
+  const db=await picDb_();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(store,'readonly');
+    const req=tx.objectStore(store).get(key);
+    req.onsuccess=()=>resolve(req.result || null);
+    req.onerror=()=>reject(req.error);
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function picDbPut_(store,key,value) {
+  const db=await picDb_();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(store,'readwrite');
+    tx.objectStore(store).put(value,key);
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error || Error('IndexedDB write failed'));
+    tx.onabort=()=>reject(tx.error || Error('IndexedDB write aborted'));
+  });
+}
+async function picDbDelete_(store,key) {
+  const db=await picDb_();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(store,'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+    tx.onabort=()=>reject(tx.error);
+  });
+}
+function picStorageError_(message) {
+  console.error('[DKLPO PIC] storage error:', message);
+  showToast(t('Bukti Belum Selamat Disimpan','Evidence Not Safely Saved'),
+    t('Storan peranti gagal. Jangan tutup borang atau padam data aplikasi.','Device storage failed. Keep the form open and do not clear app data.')+' '+String(message||''),'error');
+}
+function picDraftMetaKey_(findingId) { return PIC_DRAFT_INDEX+String(selectedPic?.picId||'')+'__'+String(findingId||''); }
+function dueDayStatus_(dueDate, status) {
+  if (!dueDate || status==='done') return {kind:'none',text:''};
+  let d = String(dueDate).trim();
+  // YYYY-MM-DD dates should use LOCAL end-of-day, not UTC parsing.
+  const m = d.match(/^(\d{4})-(\d\d)-(\d\d)(?:\s|$)/);
+  const target = m ? new Date(+m[1],+m[2]-1,+m[3],23,59,59,999) : new Date(d);
+  if (!Number.isFinite(target.getTime())) return {kind:'none',text:''};
+  const msLeft=target.getTime()-Date.now();
+  if (msLeft<0) {
+    const lateDays=Math.max(1,Math.ceil(Math.abs(msLeft)/86400000));
+    return {kind:'bad',text:t('Lewat '+lateDays+' hari','Overdue '+lateDays+' days')};
+  }
+  const delta=Math.ceil(msLeft/86400000);
+  if (delta<=3) return {kind:'warn',text:t('Baki '+delta+' hari','Due in '+delta+' days')};
+  return {kind:'ok',text:t('Dalam tempoh · '+delta+' hari','On time · '+delta+' days')};
+}
+function safePhotoUrl_(value) {
+  const v=String(value||'').trim();
+  try {const u=new URL(v);return u.protocol==='https:' || u.protocol==='http:' ? v : '';}catch(e){return '';}
+}
+function refreshPICIfVisible_() {
+  if (selectedPic && document.visibilityState==='visible' && navigator.onLine && !uploading && !syncingOfflineQueue) refreshAll({silent:true});
+}
+document.addEventListener('visibilitychange',refreshPICIfVisible_);
+let picRefreshTimer_=null;
+function startPICAutoRefresh_() {
+  clearInterval(picRefreshTimer_);
+  picRefreshTimer_=setInterval(refreshPICIfVisible_,90000);
+}
 
 function showToast(title, msg, type = 'success') {
   const el = $('toast');
@@ -1521,6 +1681,7 @@ window.addEventListener('online', () => {
   updateNetworkBanner();
   showToast(t('Sambungan Pulih', 'Back Online'), t('Menyemak barisan hantaran luar talian...', 'Checking offline submission queue...'), 'info');
   processOfflineQueue();
+  refreshPICHelp_();
 });
 window.addEventListener('offline', () => {
   updateNetworkBanner();
@@ -1530,7 +1691,13 @@ window.addEventListener('offline', () => {
 async function api(payload) {
   try {
     const params = new URLSearchParams();
-    Object.entries(payload).forEach(([k, v]) => {
+    const authorizedPayload = {...payload};
+    // Identity from the existing PIC name selection; no bearer link and no PIN.
+    if (selectedPic && selectedPic.picId && /^(getPIC[A-Za-z]*|requestPICHelp|respondPICHelp|cancelPICHelp|withdrawPICHelp|submitPICRectification|uploadPICPhoto)$/.test(String(payload.action||''))) {
+      authorizedPayload.picId = selectedPic.picId;
+      authorizedPayload.picName = selectedPic.name;
+    }
+    Object.entries(authorizedPayload).forEach(([k, v]) => {
       if (v === undefined || v === null) return;
       params.append(k, typeof v === 'object' ? JSON.stringify(v) : v);
     });
@@ -1552,6 +1719,11 @@ async function api(payload) {
 async function loadDirectory() {
   $('picDirectory').innerHTML = `<div class="empty-dir">⏳ ${t('Memuatkan direktori...', 'Loading directory...')}</div>`;
   const res = await api({ action: 'getPICDirectory' });
+  if (res && !res.ok && !res.networkError) {
+    directory=[];
+    $('picDirectory').innerHTML='<div class="empty-dir">⚠️ '+esc(res.error||'Profil PIC tidak dapat disahkan. Sila pilih nama PIC semula.')+'</div>';
+    return;
+  }
   if (res && res.ok && Array.isArray(res.pics)) {
     directory = res.pics;
     try { localStorage.setItem(STORE_DIR_CACHE, JSON.stringify(directory)); } catch (e) {}
@@ -1641,6 +1813,7 @@ function launch() {
   $('hdrName').textContent = decodeLegacyText(selectedPic.name);
   $('hdrStation').textContent = decodeLegacyText(selectedPic.station || 'PIC');
   updateNetworkBanner();
+  startPICAutoRefresh_();
   refreshAll();
 }
 
@@ -1652,6 +1825,7 @@ function logout() {
     st.removeItem(STORE_PIC_STATION);
     st.removeItem(STORE_PIC_STATIONS_JSON);
   });
+  // Simpan draf dan barisan offline; log keluar hanya menukar sesi PIC.
   location.reload();
 }
 
@@ -1676,7 +1850,7 @@ function canAssistFinding_(f, pic) {
 }
 function canActOnFinding_(f, pic) {
   if (!f || !pic) return false;
-  return canAssistFinding_(f, pic) ||
+  return (f.picHelpRole === 'HELPER' && !!f.picHelpRequestId) || canAssistFinding_(f, pic) ||
     (!!pic.picId && String(f.picId || '') === String(pic.picId)) ||
     (!!pic.name && String(f.pic || '').trim().toLowerCase() === String(pic.name).trim().toLowerCase());
 }
@@ -1705,10 +1879,11 @@ function updateSharedStationBanner_() {
     ' ' + shared.length + ' ' + t('tugasan ditugaskan kepada PIC lain dalam senarai anda.', 'listed tasks have another primary PIC.');
 }
 
-async function refreshAll() {
-  if (!selectedPic) return;
-  renderSkeletons();
-  const cacheKey = STORE_FINDINGS_CACHE_PREFIX + selectedPic.picId;
+async function refreshAll(options = {}) {
+  if (!selectedPic || uploading || syncingOfflineQueue) return;
+  if (!options.silent) renderSkeletons();
+  const requestedPicId = selectedPic.picId;
+  const cacheKey = STORE_FINDINGS_CACHE_PREFIX + requestedPicId;
 
   const res = await api({
     action: 'getPICFindings',
@@ -1717,7 +1892,28 @@ async function refreshAll() {
     deviceId: getDeviceId()
   });
 
+  // Prevent a delayed response from one PIC from appearing after a user switches PIC.
+  if (!selectedPic || selectedPic.picId !== requestedPicId) return;
+  if (res && !res.ok && !res.networkError) {
+    allFindings=[]; updateCounts();renderStationFilter();renderTab();
+    showToast(t('Akses Tidak Dibenarkan','Access Denied'),String(res.error||'Sila pilih nama PIC semula melalui skrin masuk.'),'error');
+    return;
+  }
   if (res && res.ok && Array.isArray(res.findings)) {
+    // Another PIC can submit evidence from a second phone. Surface the result to
+    // the original PIC on the next safe automatic/visibility refresh (90 seconds).
+    const previous = new Map(allFindings.map(f => [String(f.findingId), f]));
+    if (options.silent && previous.size) {
+      const newlySubmitted = res.findings.filter(f => {
+        const old = previous.get(String(f.findingId));
+        return old && classifyStatus(old) === 'action' &&
+          classifyStatus(f) === 'pending' && f.picRectificationSubmittedAt &&
+          f.picRectificationBy &&
+          String(f.picRectificationBy).trim().toLowerCase() !== String(selectedPic.name || '').trim().toLowerCase();
+      });
+      if (newlySubmitted.length) showToast('Bukti diterima daripada PIC lain',
+        newlySubmitted.length + ' tugasan telah dikemas kini. Status menunggu semakan laporan.', 'info');
+    }
     allFindings = res.findings;
     // KEMAS KINI PROFIL JIKA ADMIN ADA BUAT PERUBAHAN
     if (res.picProfile) {
@@ -1754,7 +1950,9 @@ async function refreshAll() {
   updateSharedStationBanner_();
   updateQueueBanner();
   renderTab();
+  if(navigator.onLine)refreshPICHelp_();
 }
+
 
 function classifyStatus(f) {
   const vs = String(f.picVerificationStatus || '').toUpperCase();
@@ -1946,7 +2144,8 @@ function renderFindingCard(f) {
         <span class="badge ${String(f.type || 'NCR').toLowerCase()}">${esc(f.type || 'NCR')}</span>
         <span class="badge ${String(f.severity || 'Medium').toLowerCase()}">${esc(f.severity || 'Medium')}</span>
         <span class="age-pill ${a}">📅 ${esc(ageText(age))}</span>
-        ${f.dueDate ? `<span class="age-pill ${age > 7 ? 'warn' : 'ok'}">🎯 ${esc(fmtDate(f.dueDate))}</span>` : ''}
+        ${dueDayStatus_(f.dueDate,st).kind!=='none' ? `<span class="age-pill ${dueDayStatus_(f.dueDate,st).kind}">🎯 ${esc(dueDayStatus_(f.dueDate,st).text)}</span>` : ''}
+        ${f.picHelpRole==='HELPER' ? `<span class="badge par">🤝 PIC bantuan diterima</span>` : ''}
         ${hasDraft ? `<span class="badge draft">📝 ${t('Draf Disimpan', 'Draft Saved')}</span>` : ''}
         ${isQueued ? `<span class="badge draft">📤 ${t('Barisan Offline', 'Queued Offline')}</span>` : ''}
         ${f.pic ? `<span class="badge info">👤 ${t('PIC utama', 'Primary PIC')}: ${esc(decodeLegacyText(f.pic))}</span>` : ''}
@@ -2008,7 +2207,7 @@ function openDetail(findingId) {
         <div class="tl-dot">${step2Done ? '✓' : step2Rev ? '↻' : '2'}</div>
         <div class="tl-body">
           <div class="tl-title">2. ${step2Rev ? t('Semakan Semula Bukti PIC Diperlukan', 'PIC Evidence Revision Needed') : t('Serahan Bukti Pembetulan PIC', 'PIC Rectification Submission')}</div>
-          <div class="tl-sub">${f.picRectificationSubmittedAt ? t('Dihantar pada ', 'Submitted on ') + esc(fmtDateTime(f.picRectificationSubmittedAt)) : t('Sila muat naik gambar bukti kerja siap & keterangan tindakan.', 'Please upload completed work photos & action details.')}</div>
+          <div class="tl-sub">${f.picRectificationSubmittedAt ? t('Dihantar oleh ', 'Submitted by ') + esc(decodeLegacyText(f.picRectificationBy||'-')) + ' · ' + esc(fmtDateTime(f.picRectificationSubmittedAt)) : t('Sila muat naik gambar bukti kerja siap & keterangan tindakan.', 'Please upload completed work photos & action details.')}</div>
         </div>
       </div>
       <div class="tl-row ${step3Done ? 'done' : step3Current ? 'current' : ''}">
@@ -2042,7 +2241,7 @@ function openDetail(findingId) {
       <div class="info-item"><div class="k">${t('Pelaksana Tindakan', 'Actual Submitter')}</div><div class="v">${esc(decodeLegacyText(f.picRectificationBy || '-'))}</div></div>
       <div class="info-item"><div class="k">${t('Tarikh Dicipta', 'Created')}</div><div class="v">${esc(fmtDate(f.createdDate))}</div></div>
       <div class="info-item"><div class="k">${t('Tempoh Terbuka', 'Open Duration')}</div><div class="v"><span class="age-pill ${a}">${esc(ageText(age))}</span></div></div>
-      ${f.dueDate ? `<div class="info-item full"><div class="k">${t('Tarikh Sasaran Siap (Due Date)', 'Target Due Date')}</div><div class="v">🎯 ${esc(fmtDate(f.dueDate))}</div></div>` : ''}
+      ${f.dueDate ? `<div class="info-item full"><div class="k">${t('Tarikh Sasaran Siap (Due Date)', 'Target Due Date')}</div><div class="v">🎯 ${esc(fmtDate(f.dueDate))} · ${esc(dueDayStatus_(f.dueDate,st).text)}</div></div>` : ''}
     </div>
   </div>`;
 
@@ -2087,6 +2286,7 @@ function openDetail(findingId) {
   }
 
   if (st === 'action') {
+    if(picHelpAvailable_(f)) html += `<button class="btn block info" style="margin-top:10px" data-finding-id="${esc(f.findingId)}" onclick="picHelpOpenDialog_(this.dataset.findingId)">🤝 Mohon Bantuan / Tidak Dapat Melaksanakan</button>`;
     html += `<button class="btn primary block" style="margin-top:10px" data-finding-id="${esc(f.findingId)}" onclick="openRectify(this.dataset.findingId)">
       🛠️ ${vs === 'REVISION_REQUIRED' ? t('Kemas Kini & Hantar Semula Bukti', 'Update & Resubmit Evidence') : t('Hantar Bukti Pembetulan', 'Submit Rectification Evidence')}
     </button>`;
@@ -2121,9 +2321,9 @@ function parsePhotoList(raw) {
   }
   if (!Array.isArray(arr)) arr = arr ? [arr] : [];
   return arr.map(p => {
-    if (typeof p === 'string') return { url: convertToDirectImageUrl(p), comment: '' };
+    if (typeof p === 'string') return { url: safePhotoUrl_(convertToDirectImageUrl(p)), comment: '' };
     return {
-      url: convertToDirectImageUrl(p.url || p.imageUrl || p.src || ''),
+      url: safePhotoUrl_(convertToDirectImageUrl(p.url || p.imageUrl || p.src || '')),
       comment: decodeLegacyText(p.comment || p.caption || '')
     };
   }).filter(p => p.url);
@@ -2131,7 +2331,8 @@ function parsePhotoList(raw) {
 
 /* ============ IMAGE VIEWER ============ */
 function viewImg(url, cap) {
-  $('imgViewerSrc').src = url;
+  const validated=safePhotoUrl_(url); if (!validated) return;
+  $('imgViewerSrc').src = validated;
   $('imgViewerCap').textContent = cap || '';
   $('imgViewer').classList.add('active');
 }
@@ -2140,229 +2341,199 @@ function closeImgViewer(e) {
   $('imgViewer').classList.remove('active');
 }
 
-/* ============ DRAFT AUTO-SAVE & OFFLINE QUEUE ============ */
+/* ============ DRAFT AUTO-SAVE: full evidence in IndexedDB ============ */
 function getDraftKey(findingId) {
-  // Separate private drafts for PIC 1 and PIC 2 even when they share the same browser.
-  return STORE_DRAFT_PREFIX + String(selectedPic && selectedPic.picId || 'unknown') + '__' + String(findingId || '').trim();
+  return STORE_DRAFT_PREFIX + String(selectedPic && selectedPic.picId || 'unknown') + '__' + String(findingId||'').trim();
 }
 function findLegacyDraft_(findingId) {
-  // The v2.0 key had no PIC owner. Only the original primary PIC may claim that legacy draft.
-  if (!selectedPic || !currentFinding || String(currentFinding.findingId) !== String(findingId) ||
-      !currentFinding.picId || String(currentFinding.picId) !== String(selectedPic.picId)) return null;
-  try {
-    const oldKey = STORE_DRAFT_PREFIX + String(findingId || '').trim();
-    const raw = localStorage.getItem(oldKey);
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
+  if (!selectedPic || !currentFinding || String(currentFinding.findingId)!==String(findingId) ||
+      !currentFinding.picId || String(currentFinding.picId)!==String(selectedPic.picId)) return null;
+  try {const raw=localStorage.getItem(STORE_DRAFT_PREFIX+String(findingId).trim());return raw?JSON.parse(raw):null;}catch(e){return null;}
 }
-
 function hasSavedDraft(findingId) {
-  try {
-    const raw = localStorage.getItem(getDraftKey(findingId));
-    if (!raw) return !!findLegacyDraft_(findingId);
-    const d = JSON.parse(raw);
-    return !!(d && (d.action || d.rootCause || (Array.isArray(d.photos) && d.photos.length)));
-  } catch (e) { return !!findLegacyDraft_(findingId); }
+  return !!(localStorage.getItem(picDraftMetaKey_(findingId)) || localStorage.getItem(getDraftKey(findingId)) || findLegacyDraft_(findingId));
 }
-
-function loadSavedDraft(findingId) {
-  try {
-    const raw = localStorage.getItem(getDraftKey(findingId));
-    if (raw) return JSON.parse(raw);
-    const legacy = findLegacyDraft_(findingId);
-    if (legacy) {
-      try { localStorage.setItem(getDraftKey(findingId), JSON.stringify(legacy)); } catch (e) {}
-    }
-    return legacy;
-  } catch (e) { return findLegacyDraft_(findingId); }
-}
-
-function scheduleSaveDraft() {
-  clearTimeout(draftSaveTimer);
-  draftSaveTimer = setTimeout(saveCurrentDraftNow, 350);
-}
-
-// ============ OPTIMISASI MEMORI DRAF & OFFLINE ============
-function saveCurrentDraftNow() {
-  if (!currentFinding) return;
-  const actEl = $('rectAction');
-  const rcEl = $('rectRootCause');
-  if (!actEl || !rcEl) return;
-
-  const action = actEl.value;
-  const rootCause = rcEl.value;
-  
-  // Jimat 50% memori dengan mengabaikan dataUrl sekiranya URL asal ada
-  const photosToCache = rectificationPhotos
-    .filter(p => p.dataUrl || p.url)
-    .map(p => ({
-      tmpId: p.tmpId,
-      dataUrl: p.url ? '' : p.dataUrl,
-      size: p.size || 0,
-      comment: p.comment || '',
-      url: p.url || '',
-      status: p.status === 'done' ? 'done' : 'ready',
-      annotated: !!p.annotated
-    }));
-
-  const payload = {
-    findingId: currentFinding.findingId,
-    action,
-    rootCause,
-    photos: photosToCache,
-    updatedAt: new Date().toISOString()
-  };
-
-  try {
-    localStorage.setItem(getDraftKey(currentFinding.findingId), JSON.stringify(payload));
-    const ind = $('draftSaveIndicator');
-    if (ind) {
-      ind.innerHTML = `💾 ${t('Draf disimpan automatik', 'Draft auto-saved')}`;
-      ind.style.display = 'inline-flex';
-    }
-  } catch (e) {
-    // Never silently replace an evidence draft with a text-only draft.
-    const ind = $('draftSaveIndicator');
-    if (ind) { ind.textContent = '⚠️ ' + t('Gambar belum tersimpan — jangan tutup halaman!', 'Photos not saved — keep this page open!'); ind.style.display = 'inline-flex'; }
-    showToast(t('Storan Penuh', 'Storage Full'), t('Draf gambar tidak dapat disimpan. Jangan tutup halaman sebelum bukti dihantar.', 'Photo draft could not be saved. Keep page open until submitted.'), 'error');
+async function loadSavedDraft(findingId) {
+  let v=null;
+  try {v=await picDbGet_('drafts',getDraftKey(findingId));}catch(e){console.warn('PIC IndexedDB read',e);}
+  if (v) return v;
+  try {const raw=localStorage.getItem(getDraftKey(findingId));v=raw?JSON.parse(raw):findLegacyDraft_(findingId);}catch(e){v=findLegacyDraft_(findingId);}
+  if (v) {
+    try {await picDbPut_('drafts',getDraftKey(findingId),v);localStorage.setItem(picDraftMetaKey_(findingId),'1');}catch(e){console.warn('Legacy draft still retained',e);}
   }
+  return v;
 }
-
-function clearSavedDraft(findingId) {
-  try { localStorage.removeItem(getDraftKey(findingId)); } catch (e) {}
-}
-
-function getOfflineQueue() {
-  try { return JSON.parse(localStorage.getItem(STORE_OFFLINE_QUEUE) || '[]'); }
-  catch (e) { return []; }
-}
-
-function saveOfflineQueue(q) {
+function scheduleSaveDraft() { clearTimeout(draftSaveTimer);draftSaveTimer=setTimeout(saveCurrentDraftNow,350); }
+async function saveCurrentDraftNow() {
+  // Snapshot synchronously BEFORE any await. Closing modal may clear photo array.
+  if (!currentFinding) return false;
+  const actEl=$('rectAction'),rcEl=$('rectRootCause');
+  if (!actEl || !rcEl) return false;
+  const id=String(currentFinding.findingId),key=getDraftKey(id),generation=++picDraftGeneration_;
+  const payload={findingId:id,action:actEl.value,rootCause:rcEl.value,
+    photos:rectificationPhotos.filter(p=>p.dataUrl||p.url).map(p=>({
+      tmpId:p.tmpId,dataUrl:p.url?'':p.dataUrl,
+      origDataUrl:p.url?'':(p.origDataUrl||p.dataUrl),
+      shapes:p.url?[]:(Array.isArray(p.shapes)?p.shapes:[]),
+      size:p.size||0,comment:p.comment||'',url:p.url||'',
+      status:p.status==='done'?'done':'ready',annotated:!!p.annotated
+    })),updatedAt:new Date().toISOString()};
+  const ind=$('draftSaveIndicator');
+  if (ind){ind.textContent='⏳ '+t('Menyimpan draf...','Saving draft...');ind.style.display='inline-flex';}
   try {
-    localStorage.setItem(STORE_OFFLINE_QUEUE, JSON.stringify(q));
-    updateQueueBanner();
+    const prev=picDraftWrites_.get(key)||Promise.resolve();
+    const current=prev.catch(()=>{}).then(()=>picDbPut_('drafts',key,payload));
+    picDraftWrites_.set(key,current);
+    await current;
+    localStorage.setItem(picDraftMetaKey_(id),'1');
+    if (ind && generation===picDraftGeneration_){ind.textContent='💾 '+t('Draf & gambar selamat disimpan','Draft & photos saved');ind.style.display='inline-flex';}
     return true;
-  } catch (e) {
-    // Do NOT erase existing photo drafts or other cached submissions.
-    showToast(t('Storan Penuh', 'Storage Full'), t('Barisan offline GAGAL disimpan. Jangan tutup halaman. Kosongkan ruang telefon atau cuba online.',
-      'Offline queue was NOT saved. Keep this page open; free device space or reconnect.'), 'error');
-    return false;
+  } catch(e) { picStorageError_(e.message);if(ind){ind.textContent='⚠️ '+t('Draf gagal disimpan','Draft save failed');}return false; }
+}
+async function clearSavedDraft(findingId) {
+  clearTimeout(draftSaveTimer);
+  const key=getDraftKey(findingId);
+  try {await (picDraftWrites_.get(key)||Promise.resolve()).catch(()=>{});
+    await picDbDelete_('drafts',key);localStorage.removeItem(picDraftMetaKey_(findingId));
+    localStorage.removeItem(key);}catch(e){console.warn('Draft retained after successful submission',e);}
+}
+function getOfflineQueue() {
+  try {
+    const idx=localStorage.getItem(PIC_QUEUE_INDEX);
+    if (idx!==null) return JSON.parse(idx)||[];
+    // Legacy v2 queue is still accessible until successful migration.
+    return (JSON.parse(localStorage.getItem(STORE_OFFLINE_QUEUE)||'[]')||[]).map(x=>({
+      findingId:x.findingId,picId:x.picId,picName:x.picName,needsReview:x.needsReview,lastError:x.lastError,queuedAt:x.queuedAt
+    }));
+  } catch(e){return [];}
+}
+async function getFullOfflineQueue_() {
+  const hasV3Index=localStorage.getItem(PIC_QUEUE_INDEX)!==null;
+  try {
+    const q=await picDbGet_('queues','main');
+    if(Array.isArray(q))return q;
+    if(hasV3Index && getOfflineQueue().length) throw Error('Bukti offline V3 tidak dapat dibaca. Jangan gunakan salinan lama.');
+  } catch(e) {
+    if(hasV3Index) throw Error('Storan queue IndexedDB tidak boleh dibaca: '+String(e.message||e));
+    console.warn('Legacy PIC queue fallback:',e);
+  }
+  try {const legacy=JSON.parse(localStorage.getItem(STORE_OFFLINE_QUEUE)||'[]');return Array.isArray(legacy)?legacy:[];}catch(e){return [];}
+}
+async function saveOfflineQueue(q) {
+  try {
+    await picDbPut_('queues','main',q);
+    const index=q.map(x=>({findingId:x.findingId,picId:x.picId,picName:x.picName,needsReview:!!x.needsReview,lastError:x.lastError||'',queuedAt:x.queuedAt||''}));
+    localStorage.setItem(PIC_QUEUE_INDEX,JSON.stringify(index));
+    updateQueueBanner();return true;
+  } catch(e){picStorageError_(e.message);return false;}
+}
+async function migrateLegacyPICQueue_() {
+  if (localStorage.getItem(PIC_QUEUE_INDEX)!==null) return;
+  try {
+    const raw=localStorage.getItem(STORE_OFFLINE_QUEUE);
+    const legacy=raw?JSON.parse(raw):[];
+    if (Array.isArray(legacy) && legacy.length){
+      const ok=await saveOfflineQueue(legacy);
+      if (!ok) return; // DO NOT delete the only existing evidence.
+    } else {
+      const existing=await picDbGet_('queues','main');
+      if (!existing) await picDbPut_('queues','main',[]);
+      localStorage.setItem(PIC_QUEUE_INDEX,JSON.stringify((existing||[]).map(x=>({findingId:x.findingId,picId:x.picId,needsReview:!!x.needsReview}))));
+    }
+  } catch(e){
+    // During a fresh install, IndexedDB may be unavailable in restricted previews;
+    // warn only if real legacy evidence needs migration.
+    const hasLegacy=!!(localStorage.getItem(STORE_OFFLINE_QUEUE)||'').replace(/\s/g,'').replace(/^\[\]$/,'');
+    if(hasLegacy) picStorageError_(e.message); else console.warn('[PIC] IndexedDB unavailable at startup:',e.message);
   }
 }
-
 function isFindingInOfflineQueue(findingId) {
-  return getOfflineQueue().some(item => String(item.findingId) === String(findingId));
+  return getOfflineQueue().some(x=>String(x.findingId)===String(findingId));
 }
-
 function updateQueueBanner() {
-  const q = getOfflineQueue();
-  const banner = $('queueBanner');
-  if (!banner) return;
-  const mine = selectedPic ? q.filter(x => String(x.picId) === String(selectedPic.picId)) : q;
-  banner.style.display = mine.length ? 'flex' : 'none';
-  if (!mine.length) return;
-  const problems = mine.filter(x => x.needsReview).length;
-  $('queueBannerText').textContent = `📤 ${mine.length} ${t('hantaran offline', 'offline submissions')}` +
-    (problems ? ` · ⚠️ ${problems} ${t('perlukan semakan', 'need review')}` : '');
+  const q=getOfflineQueue(), banner=$('queueBanner');if(!banner)return;
+  const mine=selectedPic?q.filter(x=>String(x.picId)===String(selectedPic.picId)):q;
+  banner.style.display=mine.length?'flex':'none';if(!mine.length)return;
+  const problems=mine.filter(x=>x.needsReview).length;
+  $('queueBannerText').textContent=`📤 ${mine.length} ${t('hantaran offline','offline submissions')}`+
+    (problems?` · ⚠️ ${problems} ${t('perlukan semakan','need review')}`:'');
 }
 function reviewOfflineQueue() {
-  if (!selectedPic) return;
-  const mine = getOfflineQueue().filter(x => String(x.picId) === String(selectedPic.picId));
-  if (!mine.length) { showToast(t('Tiada Barisan', 'Queue Empty'), t('Tiada hantaran offline.', 'No offline submissions.'), 'info'); return; }
-  const msg = mine.map((x,i) => `${i+1}. ${x.findingId} — ${x.needsReview ? 'SEMAK: ' + (x.lastError || 'Konflik status') : 'Menunggu sync'}`).join('\n');
-  // Viewing alone never removes evidence.
-  alert(t('Status barisan offline:\n', 'Offline queue status:\n') + msg + '\n\n' + t('Jika status bercanggah, hubungi Admin sebelum membuat pembetulan semula.',
-    'If a status conflicts, contact Admin before resubmitting.'));
+  if (!selectedPic)return;
+  const mine=getOfflineQueue().filter(x=>String(x.picId)===String(selectedPic.picId));
+  if(!mine.length){showToast(t('Tiada Barisan','Queue Empty'),t('Tiada hantaran offline.','No offline submissions.'),'info');return;}
+  alert(t('Status barisan offline:\n','Offline queue:\n')+mine.map((x,i)=>`${i+1}. ${x.findingId} — ${x.needsReview?'SEMAK: '+(x.lastError||'Konflik status'):'Menunggu sync'}`).join('\n'));
 }
 async function processOfflineQueue() {
-  if (syncingOfflineQueue || !selectedPic) return;
-  if (!navigator.onLine) { updateQueueBanner(); return; }
-  const q = getOfflineQueue();
-  const mine = q.filter(x => String(x.picId) === String(selectedPic.picId) && !x.needsReview);
-  if (!mine.length) { updateQueueBanner(); return; }
-  syncingOfflineQueue = true;
-  const btn = $('btnSyncNow');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
-  let successCount = 0;
+  if(syncingOfflineQueue||!selectedPic||!navigator.onLine)return;
+  // Block overlapping syncs from multiple tabs when available.
+  if(navigator.locks && navigator.locks.request){
+    return navigator.locks.request('dklpo-pic-sync-v3',{ifAvailable:true},async lock=>{
+      if(!lock)return;
+      await processOfflineQueueInner_();
+    });
+  }
+  return processOfflineQueueInner_();
+}
+async function processOfflineQueueInner_() {
+  if(syncingOfflineQueue||!selectedPic)return;
+  syncingOfflineQueue=true;
+  const btn=$('btnSyncNow');if(btn){btn.disabled=true;btn.textContent='⏳ Syncing...';}
+  let successCount=0;
   try {
-    const fresh = await api({ action: 'getPICFindings', picId: selectedPic.picId, picName: selectedPic.name, deviceId: getDeviceId() });
-    if (!fresh || !fresh.ok || !Array.isArray(fresh.findings)) {
-      showToast(t('Sync Ditangguhkan', 'Sync Deferred'), t('Gagal menyemak status terkini daripada backend. Bukti disimpan dalam queue.',
-        'Could not verify live server status. Evidence remains queued.'), 'error');
-      return;
+    const q=await getFullOfflineQueue_();
+    const mine=q.filter(x=>String(x.picId)===String(selectedPic.picId)&&!x.needsReview);
+    if(!mine.length)return;
+    const fresh=await api({action:'getPICFindings',picId:selectedPic.picId,picName:selectedPic.name,deviceId:getDeviceId()});
+    if(!fresh||!fresh.ok||!Array.isArray(fresh.findings)){
+      showToast(t('Sync Ditangguhkan','Sync Deferred'),t('Status backend belum dapat disahkan; queue masih tersimpan.','Backend status could not be checked; queue remains saved.'),'error');return;
     }
     applyFreshPICProfile_(fresh);
-    for (const item of mine) {
-      const serverFinding = fresh.findings.find(f => String(f.findingId) === String(item.findingId));
-      if (!serverFinding || classifyStatus(serverFinding) !== 'action' || !canActOnFinding_(serverFinding, selectedPic)) {
-        item.needsReview = true;
-        item.lastError = t('Tugasan telah berubah, ditutup, atau tidak lagi di stesen anda.',
-          'Task changed, closed or no longer belongs to your station.');
-        saveOfflineQueue(q);
+    for(const item of mine){
+      const serverFinding=fresh.findings.find(f=>String(f.findingId)===String(item.findingId));
+      if(!serverFinding||classifyStatus(serverFinding)!=='action'||!canActOnFinding_(serverFinding,selectedPic)){
+        item.needsReview=true;item.lastError='Tugasan ditutup, diubah atau bukan di bawah stesen PIC.';
+        if(!await saveOfflineQueue(q))break;
         continue;
       }
       try {
-        const uploaded = [];
-        for (let i = 0; i < (item.photos || []).length; i++) {
-          const ph = item.photos[i];
-          if (ph.url) { uploaded.push({url:ph.url, comment:ph.comment || ''}); continue; }
-          if (!ph.dataUrl) throw new Error('Missing offline photo data');
-          const upRes = await api({
-            action:'uploadPhoto', base64:ph.dataUrl, station:item.station || 'PIC',
-            inspectorName:(item.picName || 'PIC')+' (PIC)', month:item.month || '',
-            year:item.year || new Date().getFullYear(), index:i+1, comment:ph.comment || '',
-            uploadKey:'PIC-'+item.findingId+'-'+(ph.tmpId || i)+(ph.annotated ? '-m' : '')
-          });
-          if (!upRes || !upRes.ok) {
-            const e = new Error(upRes && upRes.error || 'Upload failed');
-            e.networkError = !!(upRes && upRes.networkError);
-            throw e;
-          }
-          ph.url = upRes.url;
-          ph.dataUrl = '';
-          uploaded.push({url:ph.url, comment:ph.comment || ''});
-          if (!saveOfflineQueue(q)) throw new Error('Failed to persist upload progress');
+        const uploaded=[];
+        for(let i=0;i<(item.photos||[]).length;i++){
+          const ph=item.photos[i];
+          if(ph.url){uploaded.push({url:ph.url,comment:ph.comment||''});continue;}
+          if(!ph.dataUrl)throw Error('Gambar offline tiada dalam storan. Jangan padam queue.');
+          const up=await api({action:'uploadPICPhoto',findingId:item.findingId,base64:ph.dataUrl,station:item.station||'PIC',
+            inspectorName:(item.picName||'PIC')+' (PIC)',month:item.month||'',year:item.year||new Date().getFullYear(),
+            index:i+1,comment:ph.comment||'',uploadKey:'PIC-'+item.findingId+'-'+(ph.tmpId||i)+(ph.annotated?'-m':'')});
+          if(!up||!up.ok){const e=Error(up&&up.error||'Upload failed');e.networkError=!!(up&&up.networkError);throw e;}
+          // Save progress BEFORE dropping base64, so the image is never lost if storage fails.
+          const oldData=ph.dataUrl;ph.url=up.url;ph.dataUrl='';
+          if(!await saveOfflineQueue(q)){ph.url='';ph.dataUrl=oldData;throw Error('Tidak dapat menyimpan kemajuan gambar');}
+          uploaded.push({url:up.url,comment:ph.comment||''});
         }
-        const subRes = await api({
-          action:'submitPICRectification', findingId:item.findingId, picId:item.picId, picName:item.picName,
-          rectificationAction:item.rectificationAction || item.action, rootCause:item.rootCause,
-          photos:uploaded, deviceId:getDeviceId()
-        });
-        if (!subRes || !subRes.ok) {
-          const e = new Error(subRes && subRes.error || 'Submit failed');
-          e.networkError = !!(subRes && subRes.networkError);
-          throw e;
-        }
-        const at = q.indexOf(item);
-        if (at !== -1) {
-          const beforeRemoval = q.slice();
-          q.splice(at,1);
-          if (!saveOfflineQueue(q)) { q.splice(0,q.length,...beforeRemoval); throw new Error('Unable to persist queue completion'); }
-        }
-        clearSavedDraft(item.findingId);
-        successCount++;
-      } catch (err) {
-        if (!err.networkError) {
-          item.needsReview = true;
-          item.lastError = String(err.message || err);
-          saveOfflineQueue(q);
-        }
-        // No claim of success; all remaining photo data stays queued.
+        const sub=await api({action:'submitPICRectification',findingId:item.findingId,picId:item.picId,picName:item.picName,
+          rectificationAction:item.rectificationAction||item.action,rootCause:item.rootCause,photos:uploaded,deviceId:getDeviceId()});
+        if(!sub||!sub.ok){const e=Error(sub&&sub.error||'Submit failed');e.networkError=!!(sub&&sub.networkError);throw e;}
+        const index=q.indexOf(item);
+        if(index!==-1){const old=q.slice();q.splice(index,1);
+          if(!await saveOfflineQueue(q)){q.splice(0,q.length,...old);throw Error('Queue sudah dihantar tetapi rekod tempatan gagal dikemas kini');}}
+        await clearSavedDraft(item.findingId);successCount++;
+      }catch(err){
+        // On uncertain delivery, next sync checks current backend state first.
+        if(!err.networkError){item.needsReview=true;item.lastError=String(err.message||err);await saveOfflineQueue(q);}
       }
     }
-  } finally {
-    syncingOfflineQueue = false;
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync'; }
-    updateQueueBanner();
+  }catch(err){
+    showToast(t('Sync Ditangguhkan','Sync Deferred'),String(err.message||err)+' — '+t('Bukti offline dikekalkan.','Offline evidence retained.'),'error');
+  }finally{
+    syncingOfflineQueue=false;if(btn){btn.disabled=false;btn.textContent='🔄 Sync';}updateQueueBanner();
   }
-  if (successCount) {
-    showToast(t('Sync Berjaya', 'Sync Completed'), `${successCount} ${t('hantaran diterima backend.', 'submissions accepted by backend.')}`, 'success');
-    refreshAll();
-  }
+  if(successCount){showToast(t('Sync Berjaya','Sync Completed'),`${successCount} ${t('hantaran diterima backend.','submissions accepted by backend.')}`,'success');await refreshAll({silent:true});}
 }
 
+
 /* ============ RECTIFICATION FORM ============ */
-function openRectify(findingId) {
+async function openRectify(findingId) {
   if (isFindingInOfflineQueue(findingId)) {
     showToast(t('Bukti Masih Dalam Barisan', 'Evidence Already Queued'),
       t('Bukti untuk isu ini masih dalam queue. Semak atau sync dahulu untuk elak laporan berganda.',
@@ -2379,7 +2550,8 @@ function openRectify(findingId) {
   $('rectSub').textContent = decodeLegacyText(f.findingId) + ' · ' + decodeLegacyText(f.station || '');
 
   const isRevision = String(f.picVerificationStatus || '').toUpperCase() === 'REVISION_REQUIRED';
-  const savedDraft = loadSavedDraft(f.findingId);
+  const savedDraft = await loadSavedDraft(f.findingId);
+  if (currentFinding !== f) return;
 
   let prefAction = isRevision ? decodeLegacyText(f.picRectificationAction || '') : '';
   let prefRoot = isRevision ? decodeLegacyText(f.picRectificationRootCause || '') : '';
@@ -2392,7 +2564,15 @@ function openRectify(findingId) {
     }
   }
 
+  const beforeEvidence=parsePhotoList(f.inspectionPhotos).slice(0,12);
+  const previousEvidence=parsePhotoList(f.picRectificationPhotos).slice(0,12);
   $('rectifyBody').innerHTML = `
+    ${(beforeEvidence.length || previousEvidence.length || f.picVerificationNotes) ? `<details class="banner info" style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:700">📷 ${t('Rujukan gambar sebelum / bukti terdahulu','Before photos / previous evidence')} (${beforeEvidence.length}/${previousEvidence.length})</summary>
+      ${f.picVerificationNotes ? `<div style="padding:8px 0">📝 ${esc(decodeLegacyText(f.picVerificationNotes))}</div>` : ''}
+      ${beforeEvidence.length ? `<div style="font-weight:700;padding:7px 0">${t('Sebelum (pemeriksaan asal)','Before (inspection)')}</div><div class="photo-grid">${beforeEvidence.map(p=>`<div class="photo-thumb" data-url="${esc(p.url)}" data-caption="${esc(p.comment)}" onclick="viewImg(this.dataset.url,this.dataset.caption)"><img loading="lazy" alt="Before" src="${esc(p.url)}"/></div>`).join('')}</div>` : ''}
+      ${previousEvidence.length ? `<div style="font-weight:700;padding:7px 0">${t('Bukti terdahulu','Previous evidence')}</div><div class="photo-grid">${previousEvidence.map(p=>`<div class="photo-thumb" data-url="${esc(p.url)}" data-caption="${esc(p.comment)}" onclick="viewImg(this.dataset.url,this.dataset.caption)"><img loading="lazy" alt="After" src="${esc(p.url)}"/></div>`).join('')}</div>` : ''}
+      </details>` : ''}
     ${isRevision ? `<div class="banner warn">✏️ ${t('Sila kemas kini bukti dan tindakan mengikut nota semakan admin.', 'Please update evidence and action based on admin review notes.')}</div>` : ''}
     ${savedDraft ? `<div class="banner info" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <span>📝 ${t('Draf terdahulu telah dipulihkan secara automatik.', 'Previous draft restored automatically.')}</span>
@@ -2431,14 +2611,15 @@ function openRectify(findingId) {
   $('rectifyModal').classList.add('active');
 }
 
-function discardDraftAndReset(findingId) {
-  clearSavedDraft(findingId);
-  openRectify(findingId);
+async function discardDraftAndReset(findingId) {
+  await clearSavedDraft(findingId);
+  await openRectify(findingId);
   renderTab();
 }
 
-function closeRectify(saveDraft = true) {
-  if (saveDraft) saveCurrentDraftNow();
+async function closeRectify(saveDraft = true) {
+  clearTimeout(draftSaveTimer);
+  if (saveDraft && !(await saveCurrentDraftNow())) return;
   $('rectifyModal').classList.remove('active');
   rectificationPhotos = [];
   renderTab();
@@ -2504,7 +2685,7 @@ async function handlePhotoPick(ev) {
   const toProcess = files.slice(0, remaining);
   for (const file of toProcess) {
     const tmpId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    const entry = { tmpId, dataUrl: '', origDataUrl: '', size: 0, comment: '', url: '', status: 'compressing', error: '', annotated: false };
+    const entry = { tmpId, dataUrl:'', origDataUrl:'', shapes:[], size:0, comment:'', url:'', status:'compressing', error:'', annotated:false };
     rectificationPhotos.push(entry);
     renderPhotoGrid();
     try {
@@ -2535,11 +2716,16 @@ function renderPhotoGrid() {
       : p.status === 'compressing' ? t('Memampat', 'Compressing')
       : `${p.annotated ? '✏️ ' : ''}${Math.round((p.size || 0) / 1024)}KB`;
 
-    return `<div class="photo-thumb">
-      ${src ? `<img src="${src}" alt="" onclick="openAnnotator('${p.tmpId}')"/>` : `<div style="width:100%;height:100%;display:grid;place-items:center;color:var(--muted);font-size:11px">⏳</div>`}
-      ${p.dataUrl && p.status !== 'uploading' ? `<button class="edit-btn" onclick="event.stopPropagation();openAnnotator('${p.tmpId}')">✏️ ${t('Tanda', 'Markup')}</button>` : ''}
-      <button class="x" onclick="event.stopPropagation();removePhoto('${p.tmpId}')">✕</button>
-      <div class="status ${cls}">${lbl}</div>
+    return `<div class="photo-entry">
+      <div class="photo-thumb">
+        ${src ? `<img src="${esc(src)}" alt="" data-photo-id="${esc(p.tmpId)}" onclick="openEvidencePhoto_(this.dataset.photoId)"/>` : `<div style="width:100%;height:100%;display:grid;place-items:center;color:var(--muted);font-size:11px">⏳</div>`}
+        ${p.dataUrl && p.status !== 'uploading' ? `<button class="edit-btn" data-photo-id="${esc(p.tmpId)}" onclick="event.stopPropagation();openAnnotator(this.dataset.photoId)">✏️ ${t('Tanda', 'Markup')}</button>` : ''}
+        <button class="x" onclick="event.stopPropagation();removePhoto('${p.tmpId}')">✕</button>
+        <div class="status ${cls}">${lbl}</div>
+      </div>
+      <input class="photo-caption" data-photo-id="${esc(p.tmpId)}" maxlength="400"
+        aria-label="${t('Kapsyen gambar','Photo caption')}" placeholder="${t('Komen gambar…','Photo note…')}"
+        value="${esc(p.comment || '')}" oninput="setPhotoCaption_(this.dataset.photoId,this.value)"/>
     </div>`;
   }).join('');
 
@@ -2552,6 +2738,16 @@ function renderPhotoGrid() {
   grid.innerHTML = tiles + addTile;
 }
 
+function openEvidencePhoto_(tmpId) {
+  const p=rectificationPhotos.find(x=>x.tmpId===tmpId);
+  if(!p)return;
+  if(p.dataUrl) openAnnotator(tmpId);
+  else if(p.url) viewImg(p.url,p.comment||'');
+}
+function setPhotoCaption_(tmpId, value) {
+  const p=rectificationPhotos.find(x=>x.tmpId===tmpId);
+  if(p){ p.comment=String(value||'').slice(0,400);scheduleSaveDraft(); }
+}
 function removePhoto(tmpId) {
   rectificationPhotos = rectificationPhotos.filter(p => p.tmpId !== tmpId);
   renderPhotoGrid();
@@ -2570,7 +2766,10 @@ async function openAnnotator(tmpId) {
   const entry = rectificationPhotos.find(p => p.tmpId === tmpId);
   if (!entry || !entry.dataUrl) return;
   annotatorTargetTmpId = tmpId;
-  annotatorShapes = [];
+  // Render on original compressed image, not already flattened marked image.
+  // Legacy drafts without origDataUrl use their flattened image without duplicate shapes.
+  annotatorShapes = entry.origDataUrl && Array.isArray(entry.shapes)
+    ? JSON.parse(JSON.stringify(entry.shapes)) : [];
   currentDrawingShape = null;
 
   try {
@@ -2760,6 +2959,9 @@ async function saveAnnotatedImage() {
   entry.url = ''; 
   entry.status = 'ready';
   entry.annotated = annotatorShapes.length > 0;
+  entry.shapes = JSON.parse(JSON.stringify(annotatorShapes));
+  // Keep the base image in IndexedDB until evidence is successfully uploaded.
+  entry.origDataUrl = entry.origDataUrl || entry.dataUrl;
 
   closeAnnotator();
   renderPhotoGrid();
@@ -2774,7 +2976,8 @@ async function uploadOnePhoto(entry, finding) {
   const findingYear = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.getFullYear() : new Date().getFullYear();
 
   const payload = {
-    action: 'uploadPhoto',
+    action: 'uploadPICPhoto',
+    findingId: finding.findingId,
     base64: entry.dataUrl,
     station: finding.station || 'PIC',
     inspectorName: (selectedPic.name || 'PIC') + ' (PIC)',
@@ -2793,10 +2996,11 @@ async function uploadOnePhoto(entry, finding) {
   return res;
 }
 
-function queueSubmissionOffline(finding, actionText, rootCause, readyPhotos) {
+async function queueSubmissionOffline(finding, actionText, rootCause, readyPhotos) {
   const parsedDate = finding.createdDate ? new Date(finding.createdDate) : null;
   const findingYear = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.getFullYear() : new Date().getFullYear();
-  const q = getOfflineQueue();
+  let q;
+  try {q=await getFullOfflineQueue_();}catch(e){picStorageError_(e.message);return false;}
   const existing = q.find(x => String(x.findingId) === String(finding.findingId));
   if (existing && String(existing.picId) !== String(selectedPic.picId)) {
     showToast(t('Bukti PIC Lain', 'Another PIC Draft'), t('Ada bukti offline PIC lain untuk isu ini pada peranti ini. Selesaikan dahulu sebelum mengganti.',
@@ -2823,11 +3027,14 @@ function queueSubmissionOffline(finding, actionText, rootCause, readyPhotos) {
     })),
     queuedAt: new Date().toISOString()
   });
-  return saveOfflineQueue(filtered);
+  return await saveOfflineQueue(filtered);
 }
 
 async function submitRectification() {
   if (uploading) return;
+  if (currentFinding && isFindingInOfflineQueue(currentFinding.findingId)) {
+    reviewOfflineQueue(); return;
+  }
   const f = currentFinding;
   if (!f) return;
 
@@ -2850,13 +3057,13 @@ async function submitRectification() {
   }
 
   if (!navigator.onLine) {
-    if (!queueSubmissionOffline(f, actionText, rootCause, ready)) return;
+    if (!await queueSubmissionOffline(f, actionText, rootCause, ready)) return;
     showToast(
       t('Disimpan Dalam Barisan Offline', 'Saved to Offline Queue'),
       t('Tiada internet. Bukti pembetulan akan dihantar secara automatik apabila talian pulih.', 'No internet. Rectification will sync automatically when back online.'),
       'info'
     );
-    closeRectify();
+    closeRectify(false);
     closeDetail();
     renderTab();
     return;
@@ -2891,10 +3098,22 @@ async function submitRectification() {
       }
       if (p.status !== 'ready') continue;
       p.status = 'uploading';
+      if (btn) btn.textContent = '⏳ '+t('Muat naik gambar','Uploading photo')+' '+(i+1)+'/'+rectificationPhotos.length;
       renderPhotoGrid();
-      const res = await uploadOnePhoto(p, f);
+      let res;
+      try {
+        res = await uploadOnePhoto(p, f);
+      } catch (uploadErr) {
+        // Never strand a photo in 'uploading' after network/server failure.
+        p.status = p.dataUrl ? 'ready' : 'error';
+        p.error = String(uploadErr.message || uploadErr);
+        renderPhotoGrid();
+        await saveCurrentDraftNow();
+        throw uploadErr;
+      }
       p.status = 'done';
       p.url = res.url;
+      await saveCurrentDraftNow();
       renderPhotoGrid();
       uploaded.push({ url: res.url, comment: p.comment || '' });
     }
@@ -2918,7 +3137,7 @@ async function submitRectification() {
       throw e;
     }
 
-    clearSavedDraft(f.findingId);
+    await clearSavedDraft(f.findingId);
     hideLoading();
     showToast(
       t('Berjaya Dihantar', 'Submitted Successfully'),
@@ -2933,7 +3152,7 @@ async function submitRectification() {
     hideLoading();
     // Only uncertain network delivery is queued. Validation/permission rejections are NOT retried forever.
     if (err.networkError) {
-      const saved = queueSubmissionOffline(f, actionText, rootCause, ready);
+      const saved = await queueSubmissionOffline(f, actionText, rootCause, ready);
       showToast(saved ? t('Cuba Lagi Apabila Online', 'Will Retry When Online') : t('Gagal Simpan Queue', 'Could Not Save Queue'),
         String(err.message || err) + (saved ? ' — ' + t('Bukti menunggu sync.', 'Evidence queued for sync.') : ''), 'error');
     } else {
@@ -2985,23 +3204,189 @@ async function submitRectification() {
   window.addEventListener('appinstalled', () => { if (gate) gate.classList.remove('show'); });
 })();
 
+
+/* =======================================================
+   V6: Login PIC sedia ada (pilih nama PIC aktif; tiada PIN).
+   Direktori umum hanya memaparkan nama, stesen, peranan.
+   WARNING: pilih nama sahaja tidak mengesahkan identiti individu.
+   ======================================================= */
+function bootPICExistingLogin_(){
+  // Only remove the obsolete access-link token, NEVER drafts, photos or queue.
+  try { localStorage.removeItem('dklpo_pic_access_v3'); } catch(e) {}
+  try {
+    const url=new URL(location.href);
+    if(url.searchParams.has('picAccess')) {
+      url.searchParams.delete('picAccess');
+      history.replaceState(null,'',url.pathname+url.search+url.hash);
+    }
+  } catch(e) {}
+  if(autoLogin()) {
+    // Profil yang disimpan akan disahkan semula melalui getPICFindings.
+    // Jika tidak aktif, backend menolak akses; jangan buang draf offline.
+    return;
+  }
+  loadDirectory();
+}
+
+/* PIC V5 — cross-station assistance, no PIN and no Admin approval. Always online for decisions. */
+let picHelpRequests_=[];
+let picHelpPendingSeen_=null;
+let picHelpDirectory_=[];
+let picHelpDialogFinding_='';
+let picHelpResponseId_='';
+function picHelpIsOwnStation_(f){ return canAssistFinding_(f, selectedPic); }
+function picHelpStatusLabel_(s){
+  const labels={PENDING:'Menunggu jawapan',ACCEPTED:'Bantuan diterima',DECLINED:'Tidak dapat membantu',
+    CANCELLED:'Dibatalkan',COMPLETED:'Bukti dihantar',EXPIRED:'Tidak lagi aktif'};
+  return labels[String(s||'').toUpperCase()]||String(s||'');
+}
+function picHelpAvailable_(f){return !!f && classifyStatus(f)==='action' && picHelpIsOwnStation_(f);}
+function picHelpOpenDialog_(id){
+  const f=allFindings.find(x=>String(x.findingId)===String(id));
+  if(!f || !picHelpAvailable_(f))return showToast('Tidak dibenarkan','Hanya PIC stesen asal boleh memohon bantuan bagi isu aktif.','error');
+  if(!navigator.onLine)return showToast('Internet diperlukan','Permohonan bantuan perlu disimpan terus ke pelayan.','info');
+  const active=picHelpRequests_.some(r=>String(r.findingId)===String(id)&&r.role==='OUTGOING'&&['PENDING','ACCEPTED'].includes(r.status));
+  if(active)return showToast('Permohonan aktif','Sila tunggu jawapan atau batalkan permohonan yang belum dijawab.','info');
+  picHelpDialogFinding_=String(id);
+  $('picHelpModalSubtitle').textContent=f.station+' • '+id;
+  $('picHelpReason').value='';
+  $('picHelpTarget').innerHTML='<option value="">Memuatkan senarai PIC...</option>';
+  $('picHelpModal').classList.add('active');
+  loadPICHelpCollaborators_();
+}
+async function loadPICHelpCollaborators_(){
+  const res=await api({action:'getPICCollaborators',deviceId:getDeviceId()});
+  const sel=$('picHelpTarget');
+  if(!res || !res.ok || !Array.isArray(res.pics)){
+    sel.innerHTML='<option value="">Gagal memuatkan direktori PIC</option>';
+    showToast('Ralat',res&&res.error||'Tidak dapat memuatkan PIC bantuan.','error');return;
+  }
+  picHelpDirectory_=res.pics;
+  sel.innerHTML='<option value="">— Pilih PIC bantuan —</option>'+res.pics.map(p=>
+    `<option value="${esc(p.picId)}">${esc(decodeLegacyText(p.name))} · ${esc(decodeLegacyText(p.role||p.department||''))} (${esc((p.stations||[]).join(', ')||p.station||'')})</option>`).join('');
+}
+function closePICHelpModal_(){$('picHelpModal').classList.remove('active');picHelpDialogFinding_='';}
+async function submitPICHelpForm_(e){
+  e.preventDefault();
+  const target=$('picHelpTarget').value, reason=$('picHelpReason').value.trim();
+  if(!target||reason.length<12)return showToast('Maklumat tidak lengkap','Pilih PIC dan nyatakan sebab sekurang-kurangnya 12 aksara.','error');
+  const btn=$('picHelpSendButton');btn.disabled=true;
+  try{
+    const res=await api({action:'requestPICHelp',findingId:picHelpDialogFinding_,helperPicId:target,
+      requestKind:$('picHelpKind').value,reason,deviceId:getDeviceId()});
+    if(!res||!res.ok)throw Error(res&&res.error||'Gagal menghantar permohonan');
+    closePICHelpModal_();closeDetail();
+    showToast('Permohonan dihantar','PIC penerima boleh terima atau tolak tanpa kelulusan Admin.','success');
+    await refreshPICHelp_();
+  }catch(err){showToast('Gagal',String(err.message||err),'error');}
+  finally{btn.disabled=false;}
+}
+function openPICHelpResponse_(id){
+  const r=picHelpRequests_.find(x=>x.requestId===id&&x.role==='INCOMING'&&x.status==='PENDING');
+  if(!r)return showToast('Tidak aktif','Segar semula senarai bantuan.','error');
+  picHelpResponseId_=id;
+  $('picHelpResponseTitle').textContent='Terima atau Tolak Bantuan';
+  $('picHelpResponseInfo').textContent=r.requestedByName+' • '+r.station+' • '+r.findingId+'\n'+r.reason;
+  $('picHelpDeclineWrap').style.display='none';$('picHelpDeclineReason').value='';
+  $('picHelpResponseButtons').innerHTML='<button class="btn primary" onclick="answerPICHelp_(\'ACCEPTED\')">✓ Terima bantuan</button><button class="btn warn" onclick="showPICHelpDecline_()">✕ Tidak dapat membantu</button>';
+  $('picHelpResponseModal').classList.add('active');
+}
+function showPICHelpDecline_(){
+  $('picHelpDeclineWrap').style.display='block';
+  $('picHelpResponseButtons').innerHTML='<button class="btn" onclick="showPICHelpResponseBack_()">Kembali</button><button class="btn warn" onclick="answerPICHelp_(\'DECLINED\')">Hantar penolakan</button>';
+}
+function showPICHelpResponseBack_(){openPICHelpResponse_(picHelpResponseId_);}
+function closePICHelpResponseModal_(){$('picHelpResponseModal').classList.remove('active');picHelpResponseId_='';}
+async function answerPICHelp_(decision){
+  const reason=$('picHelpDeclineReason').value.trim();
+  if(decision==='DECLINED'&&reason.length<8)return showToast('Sebab diperlukan','Nyatakan sebab penolakan sekurang-kurangnya 8 aksara.','error');
+  const buttons=$('picHelpResponseButtons').querySelectorAll('button');buttons.forEach(b=>b.disabled=true);
+  const res=await api({action:'respondPICHelp',requestId:picHelpResponseId_,decision,reason,deviceId:getDeviceId()});
+  buttons.forEach(b=>b.disabled=false);
+  if(!res||!res.ok)return showToast('Gagal',res&&res.error||'Tidak dapat menjawab permohonan','error');
+  closePICHelpResponseModal_();showToast('Jawapan direkodkan',picHelpStatusLabel_(decision),'success');
+  await refreshAll({silent:true});
+}
+async function cancelPICHelpRequest_(id){
+  if(!confirm('Batalkan permohonan bantuan yang belum dijawab?'))return;
+  const res=await api({action:'cancelPICHelp',requestId:id,deviceId:getDeviceId()});
+  if(!res||!res.ok)return showToast('Tidak dapat batal',res&&res.error||'Segar semula dahulu','error');
+  showToast('Dibatalkan','Permohonan dibatalkan. Anda boleh pilih PIC lain.','success');
+  await refreshPICHelp_();
+}
+async function refreshPICHelp_(notify){
+  if(!selectedPic)return;
+  const requestedFor=String(selectedPic.picId||'');
+  const section=$('picHelpPanel');section.style.display='block';
+  if(!navigator.onLine){
+    $('picHelpSummary').textContent='Offline — permohonan bantuan memerlukan internet; data tidak akan dihantar secara offline.';
+    $('picHelpItems').innerHTML='';return;
+  }
+  const res=await api({action:'getPICHelpRequests',deviceId:getDeviceId()});
+  if(!res||!res.ok||!Array.isArray(res.requests)){
+    $('picHelpSummary').textContent='Tidak dapat menyemak bantuan: '+(res&&res.error||'Sambungan gagal');
+    $('picHelpItems').innerHTML='';return;
+  }
+  if(!selectedPic || String(selectedPic.picId||'')!==requestedFor)return;
+  const pendingNow=new Set(res.requests.filter(r=>r.role==='INCOMING'&&r.status==='PENDING').map(r=>r.requestId));
+  if(picHelpPendingSeen_!==null && [...pendingNow].some(id=>!picHelpPendingSeen_.has(id)))
+    showToast('🤝 Permohonan Bantuan Baharu','PIC lain meminta bantuan anda. Lihat panel Kerjasama PIC.','info');
+  picHelpPendingSeen_=pendingNow;
+  picHelpRequests_=res.requests;
+  renderPICHelp_();
+  if(notify)showToast('Status bantuan disemak','Senarai bantuan telah dikemas kini.','success');
+}
+async function withdrawPICHelp_(id){
+  const r=picHelpRequests_.find(x=>x.requestId===id&&x.role==='INCOMING'&&x.status==='ACCEPTED');
+  if(!r)return showToast('Tidak aktif','Segar semula bantuan dahulu.','error');
+  const reason=prompt('Sebab tidak dapat meneruskan bantuan (wajib, minimum 8 aksara):');
+  if(reason===null)return;
+  if(reason.trim().length<8)return showToast('Sebab diperlukan','Nyatakan sebab sekurang-kurangnya 8 aksara.','error');
+  const res=await api({action:'withdrawPICHelp',requestId:id,reason:reason.trim(),deviceId:getDeviceId()});
+  if(!res||!res.ok)return showToast('Gagal',res&&res.error||'Tidak dapat menarik diri','error');
+  showToast('Bantuan dilepaskan','PIC asal boleh memilih PIC bantuan lain.','success');
+  await refreshAll({silent:true});
+}
+function renderPICHelp_(){
+  const incoming=picHelpRequests_.filter(r=>r.role==='INCOMING'&&r.status==='PENDING');
+  const out=picHelpRequests_.filter(r=>r.role==='OUTGOING'&&['PENDING','ACCEPTED','DECLINED'].includes(r.status));
+  const accepted=picHelpRequests_.filter(r=>r.role==='INCOMING'&&r.status==='ACCEPTED');
+  $('picHelpSummary').textContent=`${incoming.length} permohonan diterima • ${out.length} permohonan anda • ${accepted.length} bantuan sedang dibuat`;
+  const history=picHelpRequests_.filter(r=>['COMPLETED','DECLINED','CANCELLED','EXPIRED'].includes(r.status));
+  const top=[...incoming,...accepted,...out,...history.slice(0,5)].slice(0,24);
+  $('picHelpItems').innerHTML=top.length?top.map(r=>`<div class="pic-help-row">
+    <span class="pic-help-label">${r.role==='INCOMING'?'📩 Kepada saya':'📤 Daripada saya'} · ${esc(picHelpStatusLabel_(r.status))} · ${r.requestKind==='UNABLE'?'Tidak dapat laksana':'Mohon bantuan'}</span>
+    <div><b>${esc(r.station)} · ${esc(r.findingId)}</b> — ${esc(r.role==='INCOMING'?r.requestedByName:r.helperName)}</div>
+    <div class="info">${esc(decodeLegacyText(r.reason))}</div>
+    ${r.responseReason?`<div class="info">Sebab jawapan: ${esc(decodeLegacyText(r.responseReason))}</div>`:''}
+    <div class="pic-help-actions">
+      ${r.role==='INCOMING'&&r.status==='PENDING'?`<button class="btn primary small" data-help-id="${esc(r.requestId)}" onclick="openPICHelpResponse_(this.dataset.helpId)">Terima / Tolak</button>`:''}
+      ${r.role==='OUTGOING'&&r.status==='PENDING'?`<button class="btn small" data-help-id="${esc(r.requestId)}" onclick="cancelPICHelpRequest_(this.dataset.helpId)">Batal permohonan</button>`:''}
+      ${r.role==='INCOMING'&&r.status==='ACCEPTED'?`<button class="btn small primary" data-finding-id="${esc(r.findingId)}" onclick="openDetail(this.dataset.findingId)">Lihat isu & hantar bukti</button>`:''}
+      ${r.role==='INCOMING'&&r.status==='ACCEPTED'?`<button class="btn small warn" data-help-id="${esc(r.requestId)}" onclick="withdrawPICHelp_(this.dataset.helpId)">Tidak dapat teruskan</button>`:''}
+    </div>
+  </div>`).join(''):'<div class="info" style="padding:10px 0">Tiada permohonan bantuan aktif.</div>';
+}
+
 /* ============ INITIALIZATION ============ */
 (function init() {
   applyTheme(currentTheme);
   detectLang();
   initAnnotatorEvents();
   updateNetworkBanner();
+  migrateLegacyPICQueue_().then(()=>updateQueueBanner());
 
   $('picSearch').addEventListener('input', e => renderDirectory(e.target.value));
 
-  if (!autoLogin()) {
-    loadDirectory();
-  }
+  bootPICExistingLogin_();
+  // Only startPICAutoRefresh_ schedules visibility/90s refresh; avoid duplicate requests.
   document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => {
       if (e.target.id === m.id) {
         if (m.id === 'detailModal') closeDetail();
         if (m.id === 'rectifyModal') closeRectify();
+        if (m.id === 'picHelpModal') closePICHelpModal_();
+        if (m.id === 'picHelpResponseModal') closePICHelpResponseModal_();
       }
     });
   });
