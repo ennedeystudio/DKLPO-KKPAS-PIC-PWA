@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="theme-color" content="#090d16"/>
-<title>DKLPO · Portal PIC v2.0</title>
+<title>DKLPO · Portal PIC v2.1 — Stesen Bersama</title>
 <link rel="icon" type="image/png" href="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png"/>
 <!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json">
@@ -1174,7 +1174,7 @@ textarea { resize: vertical; min-height: 88px; }
     </button>
 
 <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">
-  <div>DKLPO Safety Inspection · KKPAS v2.0</div>
+  <div>DKLPO Safety Inspection · KKPAS v2.1</div>
   <div style="font-weight:600;opacity:0.85;">Copyright © Ennedey 2026 @ Dklpo</div>
 </div>
   </div>
@@ -1203,10 +1203,13 @@ textarea { resize: vertical; min-height: 88px; }
   </div>
   <div id="queueBanner" class="net-banner queue" style="display:none;">
     <span id="queueBannerText">📤 1 hantaran dalam barisan luar talian</span>
+    <button class="btn small" onclick="reviewOfflineQueue()" title="Semak status queue">🔎</button>
     <button class="btn small primary" onclick="processOfflineQueue()" id="btnSyncNow">🔄 Sync</button>
   </div>
 
 <div class="content">
+    <!-- Same-station collaboration — the named assignee remains the primary PIC -->
+    <div id="sharedStationBanner" class="banner info" style="display:none" aria-live="polite"></div>
     <!-- Summary Strip -->
     <div class="summary-strip">
       <div class="stat action" onclick="switchTab('action')">
@@ -1383,9 +1386,10 @@ let activeTab = 'action';
 let activeStationFilter = 'ALL';
 let allFindings = [];
 let currentFinding = null;
-let rectificationPhotos = []; // [{tmpId, dataUrl, origDataUrl, size, comment, status, url, error, annotated}]
+let rectificationPhotos = []; 
 let uploading = false;
 let draftSaveTimer = null;
+let syncingOfflineQueue = false;
 
 /* ============ UTILITIES & SAFE DECODING ============ */
 function $(id) { return document.getElementById(id); }
@@ -1403,11 +1407,6 @@ function decodeLegacyText(s) {
       return str.trim();
     }
   }
-}
-
-function newSubmissionId_() {
-  try { if (crypto && typeof crypto.randomUUID === 'function') return 'SUB-' + crypto.randomUUID(); } catch (_) {}
-  return 'SUB-' + Date.now() + '-' + Math.random().toString(36).slice(2,12);
 }
 
 function esc(s) {
@@ -1504,6 +1503,7 @@ function toggleLang() {
   localStorage.setItem(STORE_LANG, currentLang);
   detectLang();
   renderStationFilter();
+  updateSharedStationBanner_();
   renderTab();
 }
 
@@ -1556,7 +1556,6 @@ async function loadDirectory() {
     directory = res.pics;
     try { localStorage.setItem(STORE_DIR_CACHE, JSON.stringify(directory)); } catch (e) {}
   } else {
-    // Fallback to cached directory if offline
     try {
       const cached = JSON.parse(localStorage.getItem(STORE_DIR_CACHE) || '[]');
       if (cached.length) {
@@ -1590,7 +1589,7 @@ function renderDirectory(q) {
     const initials = String(p.name || '?').split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
     const sel = selectedPic && selectedPic.picId === p.picId ? 'active' : '';
     const stText = Array.isArray(p.stations) && p.stations.length ? p.stations.join(', ') : (p.station || '');
-    return `<div class="pic-item ${sel}" data-picid="${esc(p.picId)}" onclick="selectPicById('${esc(p.picId)}')">
+    return `<div class="pic-item ${sel}" data-picid="${esc(p.picId)}" onclick="selectPicById(this.dataset.picid)">
       <div class="pic-avatar">${esc(initials)}</div>
       <div class="pic-meta">
         <div class="name">${esc(decodeLegacyText(p.name))}</div>
@@ -1661,6 +1660,51 @@ function renderSkeletons() {
   $('tabContent').innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
 }
 
+function canonicalStation_(s) {
+  return String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('en');
+}
+function sameStation_(a, b) {
+  return !!canonicalStation_(a) && canonicalStation_(a) === canonicalStation_(b);
+}
+function stationListOf_(pic) {
+  return Array.isArray(pic && pic.stations) && pic.stations.length
+    ? pic.stations : String((pic && pic.station) || '').split(',').map(x => x.trim()).filter(Boolean);
+}
+function canAssistFinding_(f, pic) {
+  if (!f || !pic) return false;
+  return stationListOf_(pic).some(st => sameStation_(st, f.station));
+}
+function canActOnFinding_(f, pic) {
+  if (!f || !pic) return false;
+  return canAssistFinding_(f, pic) ||
+    (!!pic.picId && String(f.picId || '') === String(pic.picId)) ||
+    (!!pic.name && String(f.pic || '').trim().toLowerCase() === String(pic.name).trim().toLowerCase());
+}
+function applyFreshPICProfile_(res) {
+  if (!res || !res.picProfile || !selectedPic) return;
+  const profile = res.picProfile;
+  if (profile.stations && Array.isArray(profile.stations)) selectedPic.stations = profile.stations;
+  if (profile.station) selectedPic.station = profile.station;
+  if (profile.name) selectedPic.name = profile.name;
+}
+function updateSharedStationBanner_() {
+  const el = $('sharedStationBanner');
+  if (!el || !selectedPic) return;
+  const stations = stationListOf_(selectedPic);
+  if (!stations.length) {
+    el.style.display = 'block';
+    el.textContent = t('Tiada stesen didaftarkan. Minta Admin kemas kini profil PIC anda.', 'No station is registered. Ask Admin to update your PIC profile.');
+    return;
+  }
+  const shared = allFindings.filter(f => canAssistFinding_(f, selectedPic) &&
+    String(f.picId || '').trim() && String(f.picId || '').trim() !== String(selectedPic.picId || '').trim());
+  el.style.display = 'block';
+  el.textContent = '🤝 ' + t('Tugasan bersama stesen', 'Shared station tasks') + ': ' +
+    stations.join(', ') + '. ' + t('PIC aktif bagi stesen ini boleh menghantar bukti, walaupun laporan ditugaskan kepada PIC utama yang lain. Rekod Admin kekal menyimpan PIC utama dan nama penghantar sebenar.',
+    'Active PICs at this station may submit evidence even if a different primary PIC is assigned. The primary assignee and actual submitter are recorded separately.') +
+    ' ' + shared.length + ' ' + t('tugasan ditugaskan kepada PIC lain dalam senarai anda.', 'listed tasks have another primary PIC.');
+}
+
 async function refreshAll() {
   if (!selectedPic) return;
   renderSkeletons();
@@ -1675,6 +1719,20 @@ async function refreshAll() {
 
   if (res && res.ok && Array.isArray(res.findings)) {
     allFindings = res.findings;
+    // KEMAS KINI PROFIL JIKA ADMIN ADA BUAT PERUBAHAN
+    if (res.picProfile) {
+      selectedPic.name = res.picProfile.name || selectedPic.name;
+      selectedPic.station = res.picProfile.station || selectedPic.station;
+      selectedPic.stations = Array.isArray(res.picProfile.stations) ? res.picProfile.stations : selectedPic.stations;
+      $('hdrName').textContent = decodeLegacyText(selectedPic.name);
+      $('hdrStation').textContent = decodeLegacyText(selectedPic.station || 'PIC');
+      
+      const storage = localStorage.getItem(STORE_PIC_ID) ? localStorage : sessionStorage;
+      storage.setItem(STORE_PIC_NAME, selectedPic.name);
+      storage.setItem(STORE_PIC_STATION, selectedPic.station || '');
+      storage.setItem(STORE_PIC_STATIONS_JSON, JSON.stringify(selectedPic.stations || []));
+    }
+
     try { localStorage.setItem(cacheKey, JSON.stringify(allFindings)); } catch (e) {}
     if (navigator.onLine) processOfflineQueue();
   } else {
@@ -1693,6 +1751,8 @@ async function refreshAll() {
 
   updateCounts();
   renderStationFilter();
+  updateSharedStationBanner_();
+  updateQueueBanner();
   renderTab();
 }
 
@@ -1707,7 +1767,7 @@ function classifyStatus(f) {
 function updateCounts() {
   let a = 0, p = 0, d = 0;
   allFindings.forEach(f => {
-    if (activeStationFilter !== 'ALL' && String(f.station || '').trim() !== activeStationFilter) return;
+    if (activeStationFilter !== 'ALL' && !sameStation_(f.station, activeStationFilter)) return;
     const s = classifyStatus(f);
     if (s === 'action') a++;
     else if (s === 'pending') p++;
@@ -1750,7 +1810,7 @@ function renderStationFilter() {
   }
 
   wrap.classList.add('visible');
-  if (activeStationFilter !== 'ALL' && !stations.includes(activeStationFilter)) {
+  if (activeStationFilter !== 'ALL' && !stations.some(s => sameStation_(s, activeStationFilter))) {
     activeStationFilter = 'ALL';
   }
 
@@ -1763,9 +1823,10 @@ function renderStationFilter() {
   </button>`;
 
   stations.forEach(st => {
-    const cnt = allFindings.filter(f => classifyStatus(f) === activeTab && String(f.station || '').trim() === st).length;
-    const isAct = activeStationFilter === st ? 'active' : '';
-    html += `<button class="chip ${isAct}" onclick="setStationFilter('${esc(st)}')">
+    const cnt = allFindings.filter(f => classifyStatus(f) === activeTab && sameStation_(f.station, st)).length;
+    const isAct = sameStation_(activeStationFilter, st) ? 'active' : '';
+    const safeJsSt = String(st).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    html += `<button class="chip ${isAct}" onclick="setStationFilter('${esc(safeJsSt)}')">
       <span>🏭 ${esc(st)}</span>
       <span class="chip-count">${cnt}</span>
     </button>`;
@@ -1787,7 +1848,6 @@ function getFindingStepInfo(f) {
   const cs = String(f.closeStatus || 'OPEN').toUpperCase();
   const isClosed = cs === 'CLOSED' || cs === 'ACCEPTED' || vs === 'VERIFIED';
 
-  // 4 Steps: 1. Isu Dikesan -> 2. Tindakan PIC -> 3. Semakan Admin -> 4. Selesai
   if (isClosed) {
     return { currentStep: 4, mode: 'done', label: t('Disahkan & Ditutup', 'Verified & Closed') };
   }
@@ -1835,9 +1895,9 @@ function renderTab() {
   const q = String($('taskSearchInput')?.value || '').toLowerCase().trim();
   const list = allFindings.filter(f => {
     if (classifyStatus(f) !== activeTab) return false;
-    if (activeStationFilter !== 'ALL' && String(f.station || '').trim() !== activeStationFilter) return false;
+    if (activeStationFilter !== 'ALL' && !sameStation_(f.station, activeStationFilter)) return false;
     if (q) {
-      const hay = `${f.findingId || ''} ${f.station || ''} ${f.action || ''} ${f.rootCause || ''} ${f.type || ''}`.toLowerCase();
+      const hay = `${f.findingId || ''} ${f.station || ''} ${f.action || ''} ${f.rootCause || ''} ${f.type || ''} ${f.pic || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -1873,7 +1933,7 @@ function renderFindingCard(f) {
     : st === 'pending' ? '⏳ ' + t('Menunggu Semakan', 'Under Review') : '✅ ' + t('Selesai', 'Verified');
 
   return `
-    <div class="finding-card ${cardStatusCls}" onclick="openDetail('${esc(f.findingId)}')">
+    <div class="finding-card ${cardStatusCls}" data-finding-id="${esc(f.findingId)}" onclick="openDetail(this.dataset.findingId)">
       <div class="row1">
         <div>
           <div class="fid">${esc(decodeLegacyText(f.findingId))}</div>
@@ -1889,6 +1949,9 @@ function renderFindingCard(f) {
         ${f.dueDate ? `<span class="age-pill ${age > 7 ? 'warn' : 'ok'}">🎯 ${esc(fmtDate(f.dueDate))}</span>` : ''}
         ${hasDraft ? `<span class="badge draft">📝 ${t('Draf Disimpan', 'Draft Saved')}</span>` : ''}
         ${isQueued ? `<span class="badge draft">📤 ${t('Barisan Offline', 'Queued Offline')}</span>` : ''}
+        ${f.pic ? `<span class="badge info">👤 ${t('PIC utama', 'Primary PIC')}: ${esc(decodeLegacyText(f.pic))}</span>` : ''}
+        ${f.picRectificationBy ? `<span class="badge low">✍️ ${t('Dihantar oleh', 'Submitted by')}: ${esc(decodeLegacyText(f.picRectificationBy))}</span>` : ''}
+        ${selectedPic && canAssistFinding_(f, selectedPic) && f.picId && String(f.picId) !== String(selectedPic.picId) ? `<span class="badge par">🤝 ${t('Boleh dibantu', 'Shared task')}</span>` : ''}
       </div>
       ${renderCardStepper(f)}
     </div>
@@ -1913,7 +1976,6 @@ function openDetail(findingId) {
 
   let html = '';
 
-  // Revision or Verification Alert Banner
   if (vs === 'REVISION_REQUIRED') {
     html += `<div class="banner warn">
       <div style="font-weight:800;margin-bottom:4px;">✏️ ${t('Nota Semakan Admin (Perlu Pembaikan Semula)', 'Admin Review Note (Revision Required)')} — #${Number(f.picRevisionCount || 1)}</div>
@@ -1926,7 +1988,6 @@ function openDetail(findingId) {
     ${f.picVerificationNotes ? `<div style="margin-top:6px;font-size:12px;">💬 "${esc(decodeLegacyText(f.picVerificationNotes))}"</div>` : ''}</div>`;
   }
 
-  // Visual Stepper Timeline inside Detail Modal
   const step1Done = true;
   const step2Done = vs === 'PENDING_VERIFICATION' || st === 'done';
   const step2Rev = vs === 'REVISION_REQUIRED';
@@ -1967,12 +2028,18 @@ function openDetail(findingId) {
     </div>
   </div>`;
 
-  // Issue Details Grid
+  if (canAssistFinding_(f, selectedPic) && f.picId && String(f.picId) !== String(selectedPic.picId)) {
+    html += `<div class="banner info">🤝 ${t('Tugasan stesen bersama: anda boleh membantu menyelesaikan isu ini. PIC utama kekal',
+      'Shared station task: you may help resolve this item. Primary PIC remains')}: <b>${esc(decodeLegacyText(f.pic || '-'))}</b>.
+      ${t('Nama anda akan direkodkan sebagai penghantar bukti sebenar.', 'Your name will be recorded as the actual evidence submitter.')}</div>`;
+  }
   html += `<div class="section">
     <div class="section-h"><span>📋 ${t('Butiran Isu', 'Issue Details')}</span></div>
     <div class="info-grid">
       <div class="info-item"><div class="k">${t('Stesen', 'Station')}</div><div class="v">${esc(decodeLegacyText(f.station || '-'))}</div></div>
       <div class="info-item"><div class="k">${t('Jenis & Tahap', 'Type & Severity')}</div><div class="v">${esc(f.type || 'NCR')} · ${esc(f.severity || 'Medium')}</div></div>
+      <div class="info-item"><div class="k">${t('PIC Utama', 'Primary PIC')}</div><div class="v">${esc(decodeLegacyText(f.pic || '-'))}</div></div>
+      <div class="info-item"><div class="k">${t('Pelaksana Tindakan', 'Actual Submitter')}</div><div class="v">${esc(decodeLegacyText(f.picRectificationBy || '-'))}</div></div>
       <div class="info-item"><div class="k">${t('Tarikh Dicipta', 'Created')}</div><div class="v">${esc(fmtDate(f.createdDate))}</div></div>
       <div class="info-item"><div class="k">${t('Tempoh Terbuka', 'Open Duration')}</div><div class="v"><span class="age-pill ${a}">${esc(ageText(age))}</span></div></div>
       ${f.dueDate ? `<div class="info-item full"><div class="k">${t('Tarikh Sasaran Siap (Due Date)', 'Target Due Date')}</div><div class="v">🎯 ${esc(fmtDate(f.dueDate))}</div></div>` : ''}
@@ -1992,24 +2059,22 @@ function openDetail(findingId) {
     </div>`;
   }
 
-  // BEFORE Photos
   html += `<div class="section">
     <div class="section-h"><span>📷 ${t('Gambar Asal Pemeriksaan (Sebelum)', 'Original Inspection Photos (Before)')}</span><span>${beforePhotos.length}</span></div>
     ${beforePhotos.length
       ? `<div class="photo-grid">${beforePhotos.map(p => `
-          <div class="photo-thumb" onclick="viewImg('${esc(p.url)}','${esc(decodeLegacyText(p.comment || ''))}')">
+          <div class="photo-thumb" data-url="${esc(p.url)}" data-caption="${esc(decodeLegacyText(p.comment || ''))}" onclick="viewImg(this.dataset.url,this.dataset.caption)">
             <img src="${esc(p.url)}" loading="lazy" onerror="this.style.display='none';this.parentNode.style.background='#334155'"/>
           </div>`).join('')}</div>`
       : `<div class="banner">${t('Tiada gambar asal dilampirkan.', 'No original photos attached.')}</div>`}
   </div>`;
 
-  // AFTER Photos (if submitted)
   if (vs === 'PENDING_VERIFICATION' || vs === 'VERIFIED' || vs === 'REVISION_REQUIRED') {
     html += `<div class="section">
       <div class="section-h"><span>✅ ${t('Bukti Pembetulan PIC (Selepas)', 'PIC Rectification Evidence (After)')}</span><span>${afterPhotos.length}</span></div>
       ${afterPhotos.length
         ? `<div class="photo-grid">${afterPhotos.map(p => `
-            <div class="photo-thumb" onclick="viewImg('${esc(p.url)}','${esc(decodeLegacyText(p.comment || ''))}')">
+            <div class="photo-thumb" data-url="${esc(p.url)}" data-caption="${esc(decodeLegacyText(p.comment || ''))}" onclick="viewImg(this.dataset.url,this.dataset.caption)">
               <img src="${esc(p.url)}" loading="lazy" onerror="this.style.display='none';this.parentNode.style.background='#334155'"/>
             </div>`).join('')}</div>
             <div class="banner" style="margin-top:10px">
@@ -2022,7 +2087,7 @@ function openDetail(findingId) {
   }
 
   if (st === 'action') {
-    html += `<button class="btn primary block" style="margin-top:10px" onclick="openRectify('${esc(f.findingId)}')">
+    html += `<button class="btn primary block" style="margin-top:10px" data-finding-id="${esc(f.findingId)}" onclick="openRectify(this.dataset.findingId)">
       🛠️ ${vs === 'REVISION_REQUIRED' ? t('Kemas Kini & Hantar Semula Bukti', 'Update & Resubmit Evidence') : t('Hantar Bukti Pembetulan', 'Submit Rectification Evidence')}
     </button>`;
   }
@@ -2033,17 +2098,19 @@ function openDetail(findingId) {
 
 function closeDetail() { $('detailModal').classList.remove('active'); }
 
+// ============ PENUKAR URL DRIVE (DIBAIKI) ============
 function convertToDirectImageUrl(url) {
   if (!url) return '';
-  if (url.includes('drive.google.com/file/d/')) {
-    const m = url.match(/\/d\/([^\/]+)/);
-    if (m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  const str = String(url).trim();
+  if (str.includes('drive.google.com/file/d/')) {
+    const m = str.match(/\/d\/([^\/?&]+)/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1600`;
   }
-  if (url.includes('drive.google.com/open?id=')) {
-    const id = url.split('id=')[1];
-    if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
+  if (str.includes('drive.google.com/open?id=') || str.includes('drive.google.com/uc?')) {
+    const m = str.match(/[?&]id=([^&]+)/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1600`;
   }
-  return url;
+  return str;
 }
 
 function parsePhotoList(raw) {
@@ -2075,23 +2142,39 @@ function closeImgViewer(e) {
 
 /* ============ DRAFT AUTO-SAVE & OFFLINE QUEUE ============ */
 function getDraftKey(findingId) {
-  return STORE_DRAFT_PREFIX + String(findingId || '').trim();
+  // Separate private drafts for PIC 1 and PIC 2 even when they share the same browser.
+  return STORE_DRAFT_PREFIX + String(selectedPic && selectedPic.picId || 'unknown') + '__' + String(findingId || '').trim();
+}
+function findLegacyDraft_(findingId) {
+  // The v2.0 key had no PIC owner. Only the original primary PIC may claim that legacy draft.
+  if (!selectedPic || !currentFinding || String(currentFinding.findingId) !== String(findingId) ||
+      !currentFinding.picId || String(currentFinding.picId) !== String(selectedPic.picId)) return null;
+  try {
+    const oldKey = STORE_DRAFT_PREFIX + String(findingId || '').trim();
+    const raw = localStorage.getItem(oldKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
 }
 
 function hasSavedDraft(findingId) {
   try {
     const raw = localStorage.getItem(getDraftKey(findingId));
-    if (!raw) return false;
+    if (!raw) return !!findLegacyDraft_(findingId);
     const d = JSON.parse(raw);
     return !!(d && (d.action || d.rootCause || (Array.isArray(d.photos) && d.photos.length)));
-  } catch (e) { return false; }
+  } catch (e) { return !!findLegacyDraft_(findingId); }
 }
 
 function loadSavedDraft(findingId) {
   try {
     const raw = localStorage.getItem(getDraftKey(findingId));
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
+    if (raw) return JSON.parse(raw);
+    const legacy = findLegacyDraft_(findingId);
+    if (legacy) {
+      try { localStorage.setItem(getDraftKey(findingId), JSON.stringify(legacy)); } catch (e) {}
+    }
+    return legacy;
+  } catch (e) { return findLegacyDraft_(findingId); }
 }
 
 function scheduleSaveDraft() {
@@ -2099,6 +2182,7 @@ function scheduleSaveDraft() {
   draftSaveTimer = setTimeout(saveCurrentDraftNow, 350);
 }
 
+// ============ OPTIMISASI MEMORI DRAF & OFFLINE ============
 function saveCurrentDraftNow() {
   if (!currentFinding) return;
   const actEl = $('rectAction');
@@ -2107,13 +2191,13 @@ function saveCurrentDraftNow() {
 
   const action = actEl.value;
   const rootCause = rcEl.value;
+  
+  // Jimat 50% memori dengan mengabaikan dataUrl sekiranya URL asal ada
   const photosToCache = rectificationPhotos
     .filter(p => p.dataUrl || p.url)
-    .slice(0, 6) // limit localStorage footprint while preserving photos
     .map(p => ({
       tmpId: p.tmpId,
-      dataUrl: p.dataUrl,
-      origDataUrl: p.origDataUrl || p.dataUrl,
+      dataUrl: p.url ? '' : p.dataUrl,
       size: p.size || 0,
       comment: p.comment || '',
       url: p.url || '',
@@ -2137,12 +2221,10 @@ function saveCurrentDraftNow() {
       ind.style.display = 'inline-flex';
     }
   } catch (e) {
-    // If quota exceeded with photos, save text-only draft
-    try {
-      localStorage.setItem(getDraftKey(currentFinding.findingId), JSON.stringify({
-        findingId: currentFinding.findingId, action, rootCause, photos: [], updatedAt: new Date().toISOString()
-      }));
-    } catch (e2) {}
+    // Never silently replace an evidence draft with a text-only draft.
+    const ind = $('draftSaveIndicator');
+    if (ind) { ind.textContent = '⚠️ ' + t('Gambar belum tersimpan — jangan tutup halaman!', 'Photos not saved — keep this page open!'); ind.style.display = 'inline-flex'; }
+    showToast(t('Storan Penuh', 'Storage Full'), t('Draf gambar tidak dapat disimpan. Jangan tutup halaman sebelum bukti dihantar.', 'Photo draft could not be saved. Keep page open until submitted.'), 'error');
   }
 }
 
@@ -2150,15 +2232,22 @@ function clearSavedDraft(findingId) {
   try { localStorage.removeItem(getDraftKey(findingId)); } catch (e) {}
 }
 
-/* Offline Queue Management */
 function getOfflineQueue() {
   try { return JSON.parse(localStorage.getItem(STORE_OFFLINE_QUEUE) || '[]'); }
   catch (e) { return []; }
 }
 
 function saveOfflineQueue(q) {
-  try { localStorage.setItem(STORE_OFFLINE_QUEUE, JSON.stringify(q)); } catch (e) {}
-  updateQueueBanner();
+  try {
+    localStorage.setItem(STORE_OFFLINE_QUEUE, JSON.stringify(q));
+    updateQueueBanner();
+    return true;
+  } catch (e) {
+    // Do NOT erase existing photo drafts or other cached submissions.
+    showToast(t('Storan Penuh', 'Storage Full'), t('Barisan offline GAGAL disimpan. Jangan tutup halaman. Kosongkan ruang telefon atau cuba online.',
+      'Offline queue was NOT saved. Keep this page open; free device space or reconnect.'), 'error');
+    return false;
+  }
 }
 
 function isFindingInOfflineQueue(findingId) {
@@ -2169,82 +2258,118 @@ function updateQueueBanner() {
   const q = getOfflineQueue();
   const banner = $('queueBanner');
   if (!banner) return;
-  if (!q.length) {
-    banner.style.display = 'none';
-    return;
-  }
-  banner.style.display = 'flex';
-  $('queueBannerText').textContent = `📤 ${q.length} ${t('hantaran dalam barisan luar talian', 'submission(s) queued offline')}`;
+  const mine = selectedPic ? q.filter(x => String(x.picId) === String(selectedPic.picId)) : q;
+  banner.style.display = mine.length ? 'flex' : 'none';
+  if (!mine.length) return;
+  const problems = mine.filter(x => x.needsReview).length;
+  $('queueBannerText').textContent = `📤 ${mine.length} ${t('hantaran offline', 'offline submissions')}` +
+    (problems ? ` · ⚠️ ${problems} ${t('perlukan semakan', 'need review')}` : '');
 }
-
+function reviewOfflineQueue() {
+  if (!selectedPic) return;
+  const mine = getOfflineQueue().filter(x => String(x.picId) === String(selectedPic.picId));
+  if (!mine.length) { showToast(t('Tiada Barisan', 'Queue Empty'), t('Tiada hantaran offline.', 'No offline submissions.'), 'info'); return; }
+  const msg = mine.map((x,i) => `${i+1}. ${x.findingId} — ${x.needsReview ? 'SEMAK: ' + (x.lastError || 'Konflik status') : 'Menunggu sync'}`).join('\n');
+  // Viewing alone never removes evidence.
+  alert(t('Status barisan offline:\n', 'Offline queue status:\n') + msg + '\n\n' + t('Jika status bercanggah, hubungi Admin sebelum membuat pembetulan semula.',
+    'If a status conflicts, contact Admin before resubmitting.'));
+}
 async function processOfflineQueue() {
-  if (!navigator.onLine) {
-    showToast(t('Masih Luar Talian', 'Still Offline'), t('Sila sambung ke internet terlebih dahulu.', 'Please connect to the internet first.'), 'error');
-    return;
-  }
+  if (syncingOfflineQueue || !selectedPic) return;
+  if (!navigator.onLine) { updateQueueBanner(); return; }
   const q = getOfflineQueue();
-  if (!q.length) return;
-
+  const mine = q.filter(x => String(x.picId) === String(selectedPic.picId) && !x.needsReview);
+  if (!mine.length) { updateQueueBanner(); return; }
+  syncingOfflineQueue = true;
   const btn = $('btnSyncNow');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
-
-  const remaining = [];
   let successCount = 0;
-
-  for (const item of q) {
-    try {
-      const uploaded = [];
-      for (let i = 0; i < (item.photos || []).length; i++) {
-        const ph = item.photos[i];
-        if (ph.url) {
-          uploaded.push({ url: ph.url, comment: ph.comment || '' });
-          continue;
-        }
-        const upRes = await api({
-          action: 'uploadPhoto',
-          base64: ph.dataUrl,
-          station: item.station || 'PIC',
-          inspectorName: (item.picName || 'PIC') + ' (PIC)',
-          month: item.month || '',
-          year: item.year || new Date().getFullYear(),
-          index: i + 1,
-          comment: ph.comment || '',
-          uploadKey: 'PIC-' + item.findingId + '-' + (ph.tmpId || i)
-        });
-        if (!upRes || !upRes.ok) throw new Error(upRes && upRes.error ? upRes.error : 'Upload failed');
-        uploaded.push({ url: upRes.url, comment: ph.comment || '' });
-      }
-
-      const subRes = await api({
-        action: 'submitPICRectification',
-        findingId: item.findingId,
-        picId: item.picId,
-        picName: item.picName,
-        action: item.action,
-        rootCause: item.rootCause,
-        photos: uploaded,
-        deviceId: getDeviceId()
-      });
-
-      if (!subRes || !subRes.ok) throw new Error(subRes && subRes.error ? subRes.error : 'Submit failed');
-      clearSavedDraft(item.findingId);
-      successCount++;
-    } catch (err) {
-      remaining.push(item);
+  try {
+    const fresh = await api({ action: 'getPICFindings', picId: selectedPic.picId, picName: selectedPic.name, deviceId: getDeviceId() });
+    if (!fresh || !fresh.ok || !Array.isArray(fresh.findings)) {
+      showToast(t('Sync Ditangguhkan', 'Sync Deferred'), t('Gagal menyemak status terkini daripada backend. Bukti disimpan dalam queue.',
+        'Could not verify live server status. Evidence remains queued.'), 'error');
+      return;
     }
+    applyFreshPICProfile_(fresh);
+    for (const item of mine) {
+      const serverFinding = fresh.findings.find(f => String(f.findingId) === String(item.findingId));
+      if (!serverFinding || classifyStatus(serverFinding) !== 'action' || !canActOnFinding_(serverFinding, selectedPic)) {
+        item.needsReview = true;
+        item.lastError = t('Tugasan telah berubah, ditutup, atau tidak lagi di stesen anda.',
+          'Task changed, closed or no longer belongs to your station.');
+        saveOfflineQueue(q);
+        continue;
+      }
+      try {
+        const uploaded = [];
+        for (let i = 0; i < (item.photos || []).length; i++) {
+          const ph = item.photos[i];
+          if (ph.url) { uploaded.push({url:ph.url, comment:ph.comment || ''}); continue; }
+          if (!ph.dataUrl) throw new Error('Missing offline photo data');
+          const upRes = await api({
+            action:'uploadPhoto', base64:ph.dataUrl, station:item.station || 'PIC',
+            inspectorName:(item.picName || 'PIC')+' (PIC)', month:item.month || '',
+            year:item.year || new Date().getFullYear(), index:i+1, comment:ph.comment || '',
+            uploadKey:'PIC-'+item.findingId+'-'+(ph.tmpId || i)+(ph.annotated ? '-m' : '')
+          });
+          if (!upRes || !upRes.ok) {
+            const e = new Error(upRes && upRes.error || 'Upload failed');
+            e.networkError = !!(upRes && upRes.networkError);
+            throw e;
+          }
+          ph.url = upRes.url;
+          ph.dataUrl = '';
+          uploaded.push({url:ph.url, comment:ph.comment || ''});
+          if (!saveOfflineQueue(q)) throw new Error('Failed to persist upload progress');
+        }
+        const subRes = await api({
+          action:'submitPICRectification', findingId:item.findingId, picId:item.picId, picName:item.picName,
+          rectificationAction:item.rectificationAction || item.action, rootCause:item.rootCause,
+          photos:uploaded, deviceId:getDeviceId()
+        });
+        if (!subRes || !subRes.ok) {
+          const e = new Error(subRes && subRes.error || 'Submit failed');
+          e.networkError = !!(subRes && subRes.networkError);
+          throw e;
+        }
+        const at = q.indexOf(item);
+        if (at !== -1) {
+          const beforeRemoval = q.slice();
+          q.splice(at,1);
+          if (!saveOfflineQueue(q)) { q.splice(0,q.length,...beforeRemoval); throw new Error('Unable to persist queue completion'); }
+        }
+        clearSavedDraft(item.findingId);
+        successCount++;
+      } catch (err) {
+        if (!err.networkError) {
+          item.needsReview = true;
+          item.lastError = String(err.message || err);
+          saveOfflineQueue(q);
+        }
+        // No claim of success; all remaining photo data stays queued.
+      }
+    }
+  } finally {
+    syncingOfflineQueue = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync'; }
+    updateQueueBanner();
   }
-
-  saveOfflineQueue(remaining);
-  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync'; }
-
-  if (successCount > 0) {
-    showToast(t('Sync Berjaya', 'Sync Completed'), `${successCount} ${t('hantaran pembetulan berjaya dihantar ke pelayan.', 'rectification submission(s) synced.')}`, 'success');
+  if (successCount) {
+    showToast(t('Sync Berjaya', 'Sync Completed'), `${successCount} ${t('hantaran diterima backend.', 'submissions accepted by backend.')}`, 'success');
     refreshAll();
   }
 }
 
 /* ============ RECTIFICATION FORM ============ */
 function openRectify(findingId) {
+  if (isFindingInOfflineQueue(findingId)) {
+    showToast(t('Bukti Masih Dalam Barisan', 'Evidence Already Queued'),
+      t('Bukti untuk isu ini masih dalam queue. Semak atau sync dahulu untuk elak laporan berganda.',
+        'Evidence for this item is queued. Review or sync it first to avoid duplicates.'), 'info');
+    reviewOfflineQueue();
+    return;
+  }
   const f = allFindings.find(x => String(x.findingId) === String(findingId));
   if (!f) return;
   currentFinding = f;
@@ -2271,7 +2396,7 @@ function openRectify(findingId) {
     ${isRevision ? `<div class="banner warn">✏️ ${t('Sila kemas kini bukti dan tindakan mengikut nota semakan admin.', 'Please update evidence and action based on admin review notes.')}</div>` : ''}
     ${savedDraft ? `<div class="banner info" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <span>📝 ${t('Draf terdahulu telah dipulihkan secara automatik.', 'Previous draft restored automatically.')}</span>
-      <button class="btn small bad" onclick="discardDraftAndReset('${esc(f.findingId)}')">🗑️ ${t('Padam Draf', 'Discard')}</button>
+      <button class="btn small bad" data-finding-id="${esc(f.findingId)}" onclick="discardDraftAndReset(this.dataset.findingId)">🗑️ ${t('Padam Draf', 'Discard')}</button>
     </div>` : ''}
 
     <div class="form-group">
@@ -2312,8 +2437,8 @@ function discardDraftAndReset(findingId) {
   renderTab();
 }
 
-function closeRectify() {
-  saveCurrentDraftNow();
+function closeRectify(saveDraft = true) {
+  if (saveDraft) saveCurrentDraftNow();
   $('rectifyModal').classList.remove('active');
   rectificationPhotos = [];
   renderTab();
@@ -2436,9 +2561,9 @@ function removePhoto(tmpId) {
 /* ============ IMAGE ANNOTATION / MARKUP ENGINE ============ */
 let annotatorTargetTmpId = null;
 let annotatorBaseImg = null;
-let annotatorTool = 'arrow'; // arrow | circle | rect | pen
+let annotatorTool = 'arrow'; 
 let annotatorColor = '#ef4444';
-let annotatorShapes = []; // [{tool, color, x1, y1, x2, y2, points}]
+let annotatorShapes = []; 
 let currentDrawingShape = null;
 
 async function openAnnotator(tmpId) {
@@ -2632,7 +2757,7 @@ async function saveAnnotatedImage() {
 
   entry.dataUrl = dataUrl;
   entry.size = size;
-  entry.url = ''; // force re-upload if re-annotated
+  entry.url = ''; 
   entry.status = 'ready';
   entry.annotated = annotatorShapes.length > 0;
 
@@ -2642,7 +2767,7 @@ async function saveAnnotatedImage() {
   showToast(t('Tanda Disimpan', 'Markup Saved'), t('Penandaan gambar bukti telah dikemas kini.', 'Evidence image markup updated.'), 'success');
 }
 
-/* ============ UPLOAD + SUBMIT (WITH OFFLINE QUEUE FALLBACK & YEAR FIX) ============ */
+/* ============ UPLOAD + SUBMIT (DIBAIKI) ============ */
 async function uploadOnePhoto(entry, finding) {
   const uploadKey = 'PIC-' + finding.findingId + '-' + entry.tmpId + (entry.annotated ? '-m' : '');
   const parsedDate = finding.createdDate ? new Date(finding.createdDate) : null;
@@ -2660,32 +2785,45 @@ async function uploadOnePhoto(entry, finding) {
     uploadKey
   };
   const res = await api(payload);
-  if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'Upload failed');
+  if (!res || !res.ok) {
+    const e = new Error(res && res.error ? res.error : 'Upload failed');
+    e.networkError = !!(res && res.networkError);
+    throw e;
+  }
   return res;
 }
 
-function queueSubmissionOffline(finding, action, rootCause, readyPhotos) {
+function queueSubmissionOffline(finding, actionText, rootCause, readyPhotos) {
   const parsedDate = finding.createdDate ? new Date(finding.createdDate) : null;
   const findingYear = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate.getFullYear() : new Date().getFullYear();
-  const q = getOfflineQueue().filter(x => String(x.findingId) !== String(finding.findingId));
-  q.push({
+  const q = getOfflineQueue();
+  const existing = q.find(x => String(x.findingId) === String(finding.findingId));
+  if (existing && String(existing.picId) !== String(selectedPic.picId)) {
+    showToast(t('Bukti PIC Lain', 'Another PIC Draft'), t('Ada bukti offline PIC lain untuk isu ini pada peranti ini. Selesaikan dahulu sebelum mengganti.',
+      'Another PIC has queued evidence for this issue on this device.'), 'error');
+    return false;
+  }
+  const filtered = q.filter(x => String(x.findingId) !== String(finding.findingId));
+  filtered.push({
     findingId: finding.findingId,
     station: finding.station || 'PIC',
     month: finding.month || '',
     year: findingYear,
     picId: selectedPic.picId,
     picName: selectedPic.name,
-    action,
+    action: actionText,
+    rectificationAction: actionText,
     rootCause,
     photos: readyPhotos.map(p => ({
       tmpId: p.tmpId,
-      dataUrl: p.dataUrl,
+      dataUrl: p.url ? '' : p.dataUrl,
       url: p.url || '',
-      comment: p.comment || ''
+      comment: p.comment || '',
+      annotated: !!p.annotated
     })),
     queuedAt: new Date().toISOString()
   });
-  saveOfflineQueue(q);
+  return saveOfflineQueue(filtered);
 }
 
 async function submitRectification() {
@@ -2693,10 +2831,8 @@ async function submitRectification() {
   const f = currentFinding;
   if (!f) return;
 
-  // PEMBETULAN: Tukar nama pembolehubah ke 'actionText'
-  const actionText = $('rectAction').value.trim(); 
+  const actionText = $('rectAction').value.trim();
   const rootCause = $('rectRootCause').value.trim();
-  
   if (!actionText) {
     showToast(t('Medan Wajib', 'Required Field'), t('Sila isi keterangan tindakan pembetulan.', 'Please enter corrective action details.'), 'error');
     return;
@@ -2714,7 +2850,7 @@ async function submitRectification() {
   }
 
   if (!navigator.onLine) {
-    queueSubmissionOffline(f, actionText, rootCause, ready); // PEMBETULAN: Pas value baharu
+    if (!queueSubmissionOffline(f, actionText, rootCause, ready)) return;
     showToast(
       t('Disimpan Dalam Barisan Offline', 'Saved to Offline Queue'),
       t('Tiada internet. Bukti pembetulan akan dihantar secara automatik apabila talian pulih.', 'No internet. Rectification will sync automatically when back online.'),
@@ -2731,6 +2867,21 @@ async function submitRectification() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('Menghantar...', 'Submitting...'); }
 
   try {
+    // Shared-station permissions AND status must be checked on the server before uploading any proof.
+    const check = await api({ action: 'getPICFindings', picId:selectedPic.picId, picName:selectedPic.name, deviceId:getDeviceId() });
+    if (!check || !check.ok || !Array.isArray(check.findings)) {
+      const e = new Error(check && check.error || 'Unable to verify current finding status');
+      e.networkError = !!(check && check.networkError);
+      throw e;
+    }
+    applyFreshPICProfile_(check);
+    const latest = check.findings.find(item => String(item.findingId) === String(f.findingId));
+    if (!latest || classifyStatus(latest) !== 'action' || !canActOnFinding_(latest, selectedPic)) {
+      const e = new Error(t('Status atau kebenaran stesen telah berubah. Segar semula senarai.',
+        'Task status or station eligibility has changed. Refresh the task list.'));
+      e.networkError = false;
+      throw e;
+    }
     const uploaded = [];
     for (let i = 0; i < rectificationPhotos.length; i++) {
       const p = rectificationPhotos[i];
@@ -2751,17 +2902,21 @@ async function submitRectification() {
     if (!uploaded.length) throw new Error(t('Tiada gambar berjaya dimuat naik.', 'No photos uploaded successfully.'));
 
     const res = await api({
-      action: 'submitPICRectification', // Ini kekal action (sistem routing)
+      action: 'submitPICRectification',
       findingId: f.findingId,
       picId: selectedPic.picId,
       picName: selectedPic.name,
-      rectificationAction: actionText,  // PEMBETULAN: Pakai key baharu
+      rectificationAction: actionText,
       rootCause: rootCause,
       photos: uploaded,
       deviceId: getDeviceId()
     });
 
-    if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'Submit failed');
+    if (!res || !res.ok) {
+      const e = new Error(res && res.error ? res.error : 'Submit failed');
+      e.networkError = !!(res && res.networkError);
+      throw e;
+    }
 
     clearSavedDraft(f.findingId);
     hideLoading();
@@ -2770,18 +2925,23 @@ async function submitRectification() {
       t('Admin akan menyemak bukti pembetulan anda sebentar lagi.', 'Admin will verify your rectification evidence shortly.'),
       'success'
     );
-    closeRectify();
+    closeRectify(false);
     closeDetail();
     await refreshAll();
     switchTab('pending');
   } catch (err) {
     hideLoading();
-    queueSubmissionOffline(f, actionText, rootCause, ready); // PEMBETULAN: Pas value baharu
-    showToast(
-      t('Disimpan ke Barisan Offline', 'Queued for Retry'),
-      String(err.message || err) + ' — ' + t('Data disimpan & boleh di-sync semula.', 'Saved to offline queue for retry.'),
-      'error'
-    );
+    // Only uncertain network delivery is queued. Validation/permission rejections are NOT retried forever.
+    if (err.networkError) {
+      const saved = queueSubmissionOffline(f, actionText, rootCause, ready);
+      showToast(saved ? t('Cuba Lagi Apabila Online', 'Will Retry When Online') : t('Gagal Simpan Queue', 'Could Not Save Queue'),
+        String(err.message || err) + (saved ? ' — ' + t('Bukti menunggu sync.', 'Evidence queued for sync.') : ''), 'error');
+    } else {
+      showToast(t('Backend Menolak Hantaran', 'Server Rejected Submission'),
+        String(err.message || err) + ' — ' + t('Draf dikekalkan. Semak tugasan dan cuba lagi selepas pembetulan.',
+          'Draft retained. Review task and retry after correcting the issue.'), 'error');
+      saveCurrentDraftNow();
+    }
   } finally {
     uploading = false;
     if (btn) {
@@ -2790,6 +2950,40 @@ async function submitRectification() {
     }
   }
 }
+
+/* ============ OPTIONAL PWA INSTALL & OFFLINE SHELL ============ */
+(function initPwaInstallation_() {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
+      console.warn('PIC service worker registration failed:', err);
+    });
+  }
+  let deferredInstall = null;
+  const gate = $('kkpasInstallGate'), install = $('kkpasInstallBtn'), cont = $('kkpasContinueBtn'), steps = $('kkpasInstallSteps');
+  if (cont) cont.addEventListener('click', () => {
+    if (gate) gate.classList.remove('show');
+    sessionStorage.setItem('kkpas_pic_install_dismissed', '1');
+  });
+  window.addEventListener('beforeinstallprompt', ev => {
+    ev.preventDefault();
+    deferredInstall = ev;
+    const installed = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    if (gate && !installed && !sessionStorage.getItem('kkpas_pic_install_dismissed')) gate.classList.add('show');
+  });
+  if (install) install.addEventListener('click', async () => {
+    if (deferredInstall) {
+      const prompt = deferredInstall;
+      deferredInstall = null;
+      if (gate) gate.classList.remove('show');
+      try { await prompt.prompt(); } catch(e) {}
+    } else if (steps) {
+      steps.style.display = 'block';
+      steps.textContent = t('Pada Android: menu ⋮ → Pasang aplikasi. Pada iPhone: Kongsi → Tambah ke Skrin Utama.',
+        'On Android: menu ⋮ → Install app. On iPhone: Share → Add to Home Screen.');
+    }
+  });
+  window.addEventListener('appinstalled', () => { if (gate) gate.classList.remove('show'); });
+})();
 
 /* ============ INITIALIZATION ============ */
 (function init() {
@@ -2809,109 +3003,7 @@ async function submitRectification() {
         if (m.id === 'detailModal') closeDetail();
         if (m.id === 'rectifyModal') closeRectify();
       }
-   });
-  });
-})();
-</script>
-
-<script>
-  // Mendaftar Service Worker untuk PWA
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .then(registration => {
-          console.log('ServiceWorker berjaya didaftarkan dengan skop: ', registration.scope);
-        })
-        .catch(err => {
-          console.log('Pendaftaran ServiceWorker gagal: ', err);
-        });
     });
-  }
-</script>
-<script>
-(() => {
-  let deferredInstallPrompt = null;
-
-  // Semak jenis peranti & jika ia sudah dipasang (standalone)
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isAndroid = /android/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-
-  const gate = document.getElementById('kkpasInstallGate');
-  const btn = document.getElementById('kkpasInstallBtn');
-  const continueBtn = document.getElementById('kkpasContinueBtn');
-  const text = document.querySelector('#kkpasInstallGate p');
-  const steps = document.getElementById('kkpasInstallSteps');
-
-  function showGate() {
-    if (!gate || isStandalone) return;
-    gate.classList.add('show');
-
-    if (isIOS) {
-      text.textContent = currentLang === 'ms' ? 'Pada iPhone/iPad, pemasangan dibuat melalui Safari.' : 'On iPhone/iPad, installation is done via Safari.';
-      steps.style.display = 'block';
-      steps.innerHTML = '<strong>Cara pasang / How to install:</strong><br>1. Buka pautan ini di <strong>Safari</strong>.<br>2. Tekan ikon <strong>Share</strong> (petak dengan anak panah).<br>3. Pilih <strong>Add to Home Screen</strong>.<br>4. Tekan <strong>Add</strong>.';
-      btn.textContent = currentLang === 'ms' ? 'Saya Faham' : 'I Understand';
-    } else if (isAndroid) {
-      btn.textContent = deferredInstallPrompt ? (currentLang === 'ms' ? 'Install Aplikasi' : 'Install App') : (currentLang === 'ms' ? 'Cara Install' : 'How to Install');
-    }
-  }
-
-  function hideGate() {
-    if (gate) gate.classList.remove('show');
-  }
-
-  // Dengar event PWA dari Chrome
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    if (!isStandalone) showGate();
-  });
-
-  // Apabila berjaya dipasang
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    hideGate();
-  });
-
-  // Fungsi butang Install
-  btn?.addEventListener('click', async () => {
-    if (isIOS) {
-      hideGate();
-      return;
-    }
-
-    if (deferredInstallPrompt) {
-      try {
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        if (choice && choice.outcome === 'accepted') {
-          hideGate();
-        } else {
-          showGate();
-        }
-      } catch (err) {
-        console.warn('PWA Install failed:', err);
-      } finally {
-        deferredInstallPrompt = null;
-      }
-      return;
-    }
-
-    // Jika prompt tiada, tunjuk panduan manual
-    steps.style.display = 'block';
-    steps.innerHTML = currentLang === 'ms' 
-      ? '<strong>Sila gunakan menu browser (⋮)</strong><br>Pilih pilihan <strong>Install app</strong> atau <strong>Add to Home screen</strong>.'
-      : '<strong>Please use the browser menu (⋮)</strong><br>Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.';
-  });
-
-  continueBtn?.addEventListener('click', hideGate);
-
-  // Paparkan skrin secara automatik 0.8 saat selepas aplikasi dibuka di browser biasa
-  window.addEventListener('load', () => {
-    if (!isStandalone) {
-      setTimeout(showGate, 800);
-    }
   });
 })();
 </script>
