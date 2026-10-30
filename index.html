@@ -1160,6 +1160,49 @@ textarea { resize: vertical; min-height: 88px; }
 @media(max-width:390px){.topbar{gap:6px;padding-left:10px;padding-right:10px}.topbar .logo{width:34px;height:34px}
   .topbar .icon-btn{width:33px;height:36px}.pic-exit-btn{padding:0 8px;font-size:11px}}
 </style>
+<style>
+
+/* PWA PIC: separate no-login reporting page integrated in this file */
+body.adhoc-open{overflow:hidden}
+.adhoc-overlay{display:none;position:fixed;inset:0;overflow-y:auto;overscroll-behavior:contain;
+ background:var(--bg);color:var(--text);z-index:3000;padding-bottom:calc(32px + env(safe-area-inset-bottom));}
+.adhoc-overlay.active{display:block}
+.adhoc-overlay .status-bar{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:center;
+ min-height:48px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--stroke)}
+.adhoc-overlay .status-bar .title{font-size:16px;font-weight:800;text-align:center}
+.adhoc-overlay .main-content{width:min(100%,720px);margin:0 auto;padding:12px 14px 28px}
+.adhoc-overlay .card-mobile{background:var(--surface);border:1px solid var(--stroke);border-radius:16px;
+ padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.adhoc-overlay .card-mobile p{font-size:13px;line-height:1.65;margin:0}
+.adhoc-overlay .form-group{margin-bottom:16px}
+.adhoc-overlay .form-group label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.adhoc-overlay .form-control{display:block;width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--stroke-strong);
+ background:var(--surface-elevated);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box}
+.adhoc-overlay textarea.form-control{min-height:80px;resize:vertical}
+.adhoc-overlay .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.adhoc-overlay .photo-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px;
+ border:1px dashed var(--stroke-strong);border-radius:10px;background:var(--surface-elevated);color:var(--text);
+ font-size:13px;font-weight:700;cursor:pointer}
+.adhoc-overlay .photo-item{padding:12px;border:1px solid var(--stroke-strong);border-radius:12px;
+ background:var(--surface-elevated);display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+.adhoc-overlay .photo-item img{align-self:center;width:auto;max-width:100%;object-fit:contain}
+.adhoc-overlay .btn-submit{width:100%;min-height:52px;padding:13px 18px;margin:10px 0;border:0;border-radius:12px;
+ color:white;background:#047857;font-size:15px;font-weight:800;cursor:pointer}
+.adhoc-overlay .btn-submit:disabled{opacity:.6;cursor:wait}
+.adhoc-back{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;display:inline-flex;align-items:center;
+ justify-content:center;min-height:44px;margin:8px 12px;padding:9px 13px;border:1px solid #ef4444;border-radius:12px;
+ background:#b91c1c;color:white;font-size:13px;font-weight:800;cursor:pointer}
+.adhoc-queue-actions{display:flex;gap:8px;flex-wrap:wrap;padding:4px 0 12px}
+.adhoc-queue-actions button{flex:1 1 160px}
+.adhoc-status{padding:10px;margin:8px 0;background:var(--surface-elevated);border:1px solid var(--stroke);border-radius:10px;
+ font-size:12px;overflow-wrap:anywhere}
+@media(max-width:370px){.adhoc-overlay .main-content{padding:10px}.adhoc-overlay .card-mobile{padding:12px}}
+
+.pic-public-report{width:100%;display:flex;box-sizing:border-box;margin-top:14px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#ea580c,#b91c1c);border-color:#ea580c;color:#fff;}
+.pic-public-report:hover{color:#fff;}
+
+.pic-modal-back{width:auto;min-width:87px;padding:0 10px;font-size:12px;font-weight:800;}
+</style>
 </head>
 <body>
 <!-- ============ KKPAS INSTALL GATE ============ -->
@@ -1208,6 +1251,8 @@ textarea { resize: vertical; min-height: 88px; }
       <span data-ms="Masuk Portal" data-en="Enter Portal">Masuk Portal</span> →
     </button>
 
+<button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR (Tanpa Login)" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR (Tanpa Login)</button>
+
 <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">
   <div>DKLPO Safety Inspection · KKPAS v2.1</div>
   <div style="font-weight:600;opacity:0.85;">Copyright © Ennedey 2026 @ Dklpo</div>
@@ -1244,6 +1289,8 @@ textarea { resize: vertical; min-height: 88px; }
   </div>
 
 <div class="content">
+    <button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR (Tanpa Login)" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR (Tanpa Login)</button>
+
     <!-- Same-station collaboration — the named assignee remains the primary PIC -->
     <div id="sharedStationBanner" class="banner info" style="display:none" aria-live="polite"></div>
     <!-- Summary Strip -->
@@ -1321,7 +1368,7 @@ textarea { resize: vertical; min-height: 88px; }
         <h2 id="detailTitle">—</h2>
         <div class="sub" id="detailSub">—</div>
       </div>
-      <button class="modal-close" onclick="closeDetail()">✕</button>
+      <button class="modal-close pic-modal-back" type="button" onclick="closeDetail()">← Kembali</button>
     </div>
     <div id="detailBody"></div>
   </div>
@@ -1373,7 +1420,7 @@ textarea { resize: vertical; min-height: 88px; }
         <h2 id="rectTitle" data-ms="Serahan Pembetulan" data-en="Rectification Submission">Serahan Pembetulan</h2>
         <div class="sub" id="rectSub">—</div>
       </div>
-      <button class="modal-close" onclick="closeRectify()">✕</button>
+      <button class="modal-close pic-modal-back" type="button" onclick="closeRectify()">← Kembali</button>
     </div>
     <div id="rectifyBody"></div>
   </div>
@@ -1438,6 +1485,53 @@ textarea { resize: vertical; min-height: 88px; }
   <div class="tm" id="toastM">—</div>
 </div>
 
+<section class="adhoc-overlay" id="pageAdhocV13" role="dialog" aria-modal="true" aria-label="Laporan NCR CAR PAR" aria-hidden="true">
+  <button type="button" class="adhoc-back" onclick="adhocCloseV13_()">← Kembali ke Portal PIC</button>
+  <div class="status-bar"><div class="title">🚨 Lapor Isu NCR / CAR / PAR</div></div>
+  <div class="main-content">
+    <div class="card-mobile"><p>Laporan bebas bagi mana-mana stesen, tanpa masuk pemeriksaan bulanan. Semua butiran akan dihantar untuk tindakan PIC dan pemantauan Admin.</p></div>
+    <div class="card-mobile">
+      <div class="form-group"><label>Nama sebenar pelapor *</label><input class="form-control" id="adhocReporterV13" autocomplete="name" maxlength="150" placeholder="Nama pelapor" /></div>
+      <div class="form-group"><label>Stesen berlaku isu *</label><select class="form-control" id="adhocStationV13"><option value="">-- Pilih stesen --</option>
+          <option value="Office">Office</option>
+          <option value="Clinic &amp; Canteen">Clinic &amp; Canteen</option>
+          <option value="Guard House">Guard House</option>
+          <option value="FFB Grading">FFB Grading</option>
+          <option value="Lab">Lab</option>
+          <option value="Sterilizer">Sterilizer</option>
+          <option value="Press Station">Press Station</option>
+          <option value="Tippler">Tippler</option>
+          <option value="Kernel Plant">Kernel Plant</option>
+          <option value="Workshop">Workshop</option>
+          <option value="Store">Store</option>
+          <option value="Biogas">Biogas</option>
+          <option value="Effluent">Effluent</option>
+          <option value="Solvent Plant">Solvent Plant</option>
+          <option value="Boiler House">Boiler House</option>
+      </select></div>
+      <div class="form-group"><label>Jenis isu *</label><select class="form-control" id="adhocTypeV13"><option value="NCR">NCR — Laporan Ketidakpatuhan</option><option value="CAR">CAR — Tindakan Pembetulan</option><option value="PAR">PAR — Tindakan Pencegahan</option></select></div>
+      <div class="form-group"><label>Tahap risiko *</label><select class="form-control" id="adhocSeverityV13"><option value="Low">Rendah</option><option selected value="Medium">Sederhana</option><option value="High">Tinggi</option></select></div>
+      <div class="form-group"><label>Kategori / Item Isu *</label><input class="form-control" id="adhocItemV13" maxlength="250" placeholder="Contoh: Kebocoran minyak" /></div>
+      <div class="form-group"><label>Keterangan isu / tindakan diperlukan *</label><textarea class="form-control" id="adhocActionV13" rows="3"></textarea></div>
+      <div class="form-group"><label>Cadangan punca akar (pilihan)</label><textarea class="form-control" id="adhocRootV13" rows="2"></textarea></div>
+      <div class="form-group"><label>Tarikh sasaran pembetulan (pilihan)</label><input type="date" class="form-control" id="adhocDueV13"></div>
+      <div class="form-group"><label>Lokasi GPS (pilihan)</label><button type="button" class="photo-btn" onclick="adhocCaptureGpsV13_()">📍 Ambil GPS sekarang</button><div id="adhocGpsStatusV13" style="margin-top:8px;font-size:12px">GPS belum direkodkan</div></div>
+    </div>
+    <div class="card-mobile">
+      <label style="display:block;margin-bottom:8px">Gambar bukti isu * (had sama seperti pemeriksaan: 12 gambar, 250 KB setiap gambar selepas mampatan)</label>
+      <div class="photo-actions">
+        <button type="button" class="photo-btn" onclick="document.getElementById('adhocCameraV13').click()">📷 Kamera</button>
+        <button type="button" class="photo-btn" onclick="document.getElementById('adhocGalleryV13').click()">🖼️ Galeri</button>
+      </div>
+      <input type="file" id="adhocCameraV13" accept="image/*" capture="environment" style="display:none" onchange="adhocAddPhotosV13_(this)">
+      <input type="file" id="adhocGalleryV13" accept="image/*" multiple style="display:none" onchange="adhocAddPhotosV13_(this)">
+      <div id="adhocPhotoListV13"></div>
+    </div>
+    <div class="adhoc-queue-actions"><button type="button" class="photo-btn" onclick="adhocReviewQueueV13_()">📦 Laporan Tertangguh</button><button type="button" class="photo-btn" onclick="adhocSyncQueuedV13_()">🔄 Cuba Hantar Laporan Tertangguh</button></div>
+    <div class="adhoc-status" id="adhocQueueStatusV13" role="status" aria-live="polite" hidden></div>
+    <button type="button" class="btn-submit" id="adhocSubmitV13" onclick="adhocSubmitV13_()">🚨 Hantar Laporan</button>
+  </div>
+</section>
 <script>
 /* =========================================================
    DKLPO PIC PORTAL — v2.0 (Modern UI + Offline + Filter + Markup + Timeline)
@@ -3407,6 +3501,313 @@ function renderPICHelp_(){
     });
   });
 })();
+</script>
+<script>
+
+const ADHOC_CHECKLIST_DATA_V13_ = {
+  ms: [
+    {sec:"Pengurusan", items:["Polisi keselamatan,Alam Sekitar dan MSPO lengkap dan dipamerkan","Rekod latihan dikemaskini","Permit To Work sedia","SOP dipatuhi"]},
+    {sec:"Housekeeping", items:["Laluan tidak terhalang","Lantai tidak licin","Pencahayaan mencukupi","Signage jelas","Kondisi Lantai (Tidak licin, Lubang Lantai, Penutup Lantai, Penutup Parit)","Hos dan Kabel Disusun Rapi","Kebersihan Umum Tempat Kerja"]},
+    {sec:"PPE", items:["PPE dipakai betul","PPE baik & cukup","Tempat simpan kemas"]},
+    {sec:"Mesin", items:["Guarding lengkap","Emergency stop berfungsi","Tiada bahagian terdedah","Lockout/Tagout dipatuhi","Keadaan Fizikal Mesin Selamat","Operator mesin terlatih"]},
+    {sec:"Elektrikal", items:["Panel berkunci","Tiada kabel rosak","Grounding memadai","LOTO dipatuhi","Peralatan elektrik dalam keadaan baik dan selamat"]},
+    {sec:"Bahan Kimia", items:["Dilabel betul","SDS tersedia","Storage selamat"]},
+    {sec:"Kebakaran & Kecemasan", items:["Fire extinguisher cukup, mudah dicapai, belum tamat tempoh","Adakah Tekanan Fire extinguisher masih di dalam tekanan normal","Laluan ke hydrant/fire point tidak dihalang","Hose Reel dan Fire Hydrant mempunyai tekanan air yang mencukupi, tiada kesan kebocoran pada sistem paip, serta air dapat mengalir dengan lancar semasa pengujian","Pelan pemindahan & assembly point jelas","First aid box lengkap (jika berkaitan)"]},
+    {sec:"Alam Sekitar", items:["Tiada kebocoran/pelepasan tidak terkawal (effluent/biogas/kimia)","Tumpahan ditangani dengan betul","Housekeeping longkang/sump baik","Sampah domestik dibuang secara teratur dan tong sampah bertutup","Bahan kitar semula (kertas, plastik, besi) diasingkan mengikut kategori","Bahan kitar semula diasingkan mengikut kategori (3R)","Buangan Terjadual (SW) dilabel, disimpan dalam bekas sempurna, dan diletakkan di stor khas (SW Store)"]}
+  ],
+  en: [
+    {sec:"Management", items:["Safety policy displayed","Training records updated","Permit To Work available","SOP followed"]},
+    {sec:"Housekeeping", items:["Pathways not obstructed","Floors not slippery","Adequate lighting","Clear signage","Floor condition safe (no slippery surfaces, holes or unsafe drain covers)","Hoses and cables arranged neatly","General workplace cleanliness maintained"]},
+    {sec:"PPE", items:["PPE worn correctly","PPE in good condition & sufficient","Storage area tidy"]},
+    {sec:"Machinery", items:["Guarding complete","Emergency stop functional","No exposed parts","Lockout/Tagout followed","Physical condition of machinery is safe","Machine operators adequately trained"]},
+    {sec:"Electrical", items:["Panels locked","No damaged cables","Adequate grounding","Lockout/Tagout (LOTO) procedures followed","Electrical equipment in safe working condition"]},
+    {sec:"Chemicals", items:["Properly labeled","SDS available","Safe storage"]},
+    {sec:"Fire & Emergency", items:["Fire extinguisher sufficient, accessible, not expired","Fire extinguisher pressure within normal range","Path to hydrant/fire point not obstructed","Hose Reel and Fire Hydrant have adequate water pressure, no pipe leaks, water flows smoothly during testing","Evacuation plan & assembly point clear","First aid box complete (if applicable)"]},
+    {sec:"Environment", items:["No uncontrolled leaks/discharge (effluent/biogas/chemical)","Spills handled properly","Drain/sump housekeeping good","Domestic waste disposed regularly and bins covered","Recyclables (paper, plastic, metal) sorted by category","Recyclables sorted by category (3R)","Scheduled Waste (SW) labeled, stored in proper containers, placed in dedicated storage (SW Store)"]}
+  ]
+};
+
+const ADHOC_CANTEEN_CHECKLIST_V13_ = {
+  ms: [
+    {sec:"🔴 A. Kebersihan & Sanitasi", items:["Lantai bersih, tidak berminyak","Longkang tidak tersumbat","Tiada sisa makanan terdedah","Meja & permukaan kerja disanitasi","Tong sampah bertutup & tidak melimpah","Tiada kehadiran lalat / tikus"]},
+    {sec:"🟡 B. Pengendalian Makanan", items:["Makanan mentah & masak diasingkan","Makanan panas >60°C","Makanan sejuk <5°C","Tarikh luput dipantau","Tiada makanan basi / berbau"]},
+    {sec:"🟢 C. Penyimpanan", items:["Peti sejuk berfungsi","Freezer bersuhu sesuai","Rak makanan tidak sentuh lantai","Bahan kimia tidak disimpan bersama makanan"]},
+    {sec:"🔵 D. Kebersihan Pekerja", items:["Pekerja pakai apron bersih","Pakai penutup kepala","Kuku pendek & bersih","Tiada pekerja sakit mengendalikan makanan"]},
+    {sec:"🟣 E. Keselamatan", items:["Pemadam api tersedia","Laluan kecemasan tidak terhalang","Silinder gas dalam keadaan baik","Tiada kebocoran gas"]}
+  ],
+  en: [
+    {sec:"🔴 A. Cleanliness & Sanitation", items:["Floors clean, not oily","Drains not clogged","No exposed food waste","Tables & surfaces sanitized","Bins covered & not overflowing","No flies / rodents"]},
+    {sec:"🟡 B. Food Handling", items:["Raw & cooked food separated","Hot food >60°C","Cold food <5°C","Expiry dates monitored","No spoiled / foul food"]},
+    {sec:"🟢 C. Storage", items:["Refrigerator working","Freezer at proper temperature","Food racks not touching floor","Chemicals not stored with food"]},
+    {sec:"🔵 D. Worker Hygiene", items:["Workers wear clean aprons","Wear head covering","Short & clean nails","No sick workers handling food"]},
+    {sec:"🟣 E. Safety", items:["Fire extinguisher available","Emergency route clear","Gas cylinders in good condition","No gas leaks"]}
+  ]
+};
+
+/* Standalone single-file report module. Backend remains unchanged. */
+const ADHOC_AI_ENABLED_V13 = true;
+const ADHOC_MAX_PHOTO_KB_V13_ = 250;
+const ADHOC_DB_V13_ = 'kkpas-offline-v1';
+const ADHOC_DB_VERSION_V13_ = 3;
+let adhocPhotosV13_ = [];
+let adhocIdV13_ = '';
+let adhocBusyV13_ = false;
+let adhocGpsV13_ = null;
+let adhocSyncBusyV13_ = false;
+function adhocGetV13_(id){ return document.getElementById(id); }
+function adhocToastV13_(msg,type='info') {showToast(type==='error'?'Ralat Laporan':type==='success'?'Laporan Berjaya':'Status Laporan',msg,type);}
+function adhocNewIdV13_(){
+  return 'SUB-'+((typeof crypto!=='undefined' && crypto.randomUUID)?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+}
+function adhocDbV13_(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(ADHOC_DB_V13_,ADHOC_DB_VERSION_V13_);
+    req.onupgradeneeded=()=>{const d=req.result;
+      if(!d.objectStoreNames.contains('drafts'))d.createObjectStore('drafts',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('offlineQueue'))d.createObjectStore('offlineQueue',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv',{keyPath:'key'});
+    };
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error('IndexedDB unavailable'));
+  });
+}
+async function adhocTxV13_(mode,method,value){
+  const db=await adhocDbV13_();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('offlineQueue',mode);const store=tx.objectStore('offlineQueue');
+    const req=method==='getAll'?store.getAll():method==='put'?store.put(value):method==='delete'?store.delete(value):store.get(value);
+    let result;req.onsuccess=()=>{result=req.result};
+    tx.oncomplete=()=>{db.close();resolve(result)};
+    tx.onabort=tx.onerror=()=>{const e=tx.error||req.error||Error('Storan gagal');db.close();reject(e)};
+  });
+}
+function adhocCaptureGpsV13_(){
+  const el=adhocGetV13_('adhocGpsStatusV13');
+  if(!navigator.geolocation){el.textContent='GPS tidak disokong oleh peranti';return;}
+  el.textContent='Mendapatkan lokasi...';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    adhocGpsV13_={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy};
+    el.textContent='GPS direkodkan • ketepatan ±'+Math.round(pos.coords.accuracy)+' m';
+  },()=>{el.textContent='Tidak dapat mengambil GPS. Laporan masih boleh dihantar.'},
+  {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+function adhocOpenV13_(){
+  const page=adhocGetV13_('pageAdhocV13');page.classList.add('active');page.setAttribute('aria-hidden','false');
+  document.body.classList.add('adhoc-open');page.scrollTop=0;
+  adhocGetV13_('adhocReporterV13').value=localStorage.getItem('dklpo_adhoc_reporter_v13')||'';
+  if(!adhocIdV13_)adhocIdV13_=adhocNewIdV13_();
+  adhocReviewQueueV13_(false);
+}
+function adhocCloseV13_(){
+  if(adhocBusyV13_||adhocSyncBusyV13_){adhocToastV13_('Penghantaran sedang berjalan. Tunggu pengesahan atau ralat.','info');return;}
+  const page=adhocGetV13_('pageAdhocV13');page.classList.remove('active');page.setAttribute('aria-hidden','true');
+  document.body.classList.remove('adhoc-open');
+}
+async function adhocCompressFileV13_(file){
+  if(!file || !String(file.type||'').startsWith('image/'))throw Error('Sila pilih fail imej yang sah');
+  const source=await readFileAsDataURL(file);const img=await loadImage(source);
+  let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  if(!w||!h)throw Error('Dimensi gambar tidak dapat dibaca');
+  const ratio=Math.min(1,1600/w,1600/h);w=Math.max(1,Math.round(w*ratio));h=Math.max(1,Math.round(h*ratio));
+  const canvas=document.createElement('canvas');const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx)throw Error('Peranti tidak menyokong pemampatan gambar');
+  for(let a=0;a<15;a++){
+    canvas.width=w;canvas.height=h;ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+    for(const quality of [.9,.82,.74,.66,.58,.50,.42,.34,.26,.20]){
+      const data=canvas.toDataURL('image/jpeg',quality);
+      if(estimateBase64Bytes(data)<=ADHOC_MAX_PHOTO_KB_V13_*1024)return data;
+    }
+    if(Math.min(w,h)<=160)break;
+    w=Math.max(1,Math.round(w*.82));h=Math.max(1,Math.round(h*.82));
+  }
+  throw Error('Gambar tidak dapat dimampatkan kepada 250 KB');
+}
+async function adhocAddPhotosV13_(input){
+  const files=Array.from(input.files||[]);input.value='';
+  const available=MAX_PHOTOS-adhocPhotosV13_.length;
+  if(files.length>available)adhocToastV13_('Maksimum '+MAX_PHOTOS+' gambar bagi satu laporan.','info');
+  for(const file of files.slice(0,Math.max(0,available))){
+    try{const data=await adhocCompressFileV13_(file),size=estimateBase64Bytes(data);
+      adhocPhotosV13_.push({id:adhocNewIdV13_(),data,size,comment:'',analysis:null});
+    }catch(e){adhocToastV13_(e.message||'Gagal proses gambar','error');}
+  }
+  adhocRenderV13_();
+}
+function adhocRenderV13_(){
+  const root=adhocGetV13_('adhocPhotoListV13');root.replaceChildren();
+  adhocPhotosV13_.forEach((ph,i)=>{
+    const box=document.createElement('div');box.className='photo-item';
+    const label=document.createElement('strong');label.textContent='Gambar '+(i+1)+' ('+Math.round(ph.size/1024)+' KB)';box.appendChild(label);
+    const image=document.createElement('img');image.src=ph.data;image.alt='Gambar bukti '+(i+1);image.style.maxHeight='180px';box.appendChild(image);
+    const desc=document.createElement('textarea');desc.className='form-control';desc.rows=2;desc.maxLength=400;
+    desc.placeholder='Kapsyen gambar';desc.value=ph.comment;desc.addEventListener('input',()=>ph.comment=desc.value);box.appendChild(desc);
+    if(ADHOC_AI_ENABLED_V13){const ai=document.createElement('button');ai.type='button';ai.className='photo-btn';
+      ai.textContent=ph.analysis?'🤖 AI: Semak semula':'🤖 Semak Gambar dengan AI';
+      ai.addEventListener('click',()=>adhocReviewAiV13_(ph,ai));box.appendChild(ai);}
+    const remove=document.createElement('button');remove.type='button';remove.className='photo-btn';remove.textContent='🗑️ Buang gambar';
+    remove.addEventListener('click',()=>{adhocPhotosV13_=adhocPhotosV13_.filter(x=>x.id!==ph.id);adhocRenderV13_()});box.appendChild(remove);
+    root.appendChild(box);
+  });
+}
+async function adhocPostV13_(payload,timeoutMs=90000){
+  const params=new URLSearchParams();
+  Object.entries(payload).forEach(([key,val])=>params.append(key,typeof val==='object'?JSON.stringify(val):String(val??'')));
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const resp=await fetch(WEB_APP_URL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params,signal:controller.signal});
+    const raw=await resp.text();let result;
+    try{result=JSON.parse(raw);}catch(_){const e=new Error('Respons pelayan bukan JSON (HTTP '+resp.status+')');e.retryable=resp.status>=500||resp.status===429;e.serverResponse=true;throw e;}
+    if(!resp.ok||!result||!result.ok){const e=new Error(result&&result.error||'HTTP '+resp.status);
+      e.retryable=typeof result?.retryable==='boolean'?result.retryable:(resp.status>=500||resp.status===429);
+      e.serverResponse=true;throw e;}
+    return result;
+  }catch(err){
+    if(!err.serverResponse){err.isTransportError=true;err.retryable=true;}
+    throw err;
+  }finally{clearTimeout(timer);}
+}
+async function adhocReviewAiV13_(ph,btn){
+  const station=adhocGetV13_('adhocStationV13').value;
+  if(!station)return adhocToastV13_('Pilih stesen dahulu.');
+  btn.disabled=true;btn.textContent='⏳ AI sedang menyemak...';
+  try{
+    const lg=currentLang==='en'?'en':'ms';
+    const arr=station==='Clinic & Canteen'?ADHOC_CANTEEN_CHECKLIST_V13_[lg]:ADHOC_CHECKLIST_DATA_V13_[lg];
+    const checks=arr.map(s=>({section:s.sec,items:s.items}));
+    const result=await adhocPostV13_({action:'reviewAdhocFindingPhoto',station,inspectionLang:lg,imageData:ph.data,
+      checklist:JSON.stringify(checks),existingChecklist:'{}'},45000);
+    if(!result.analysis)throw Error('AI tidak tersedia');
+    ph.analysis=result.analysis;const a=result.analysis;
+    if(['NCR','CAR','PAR','CAP'].includes(a.findingType))adhocGetV13_('adhocTypeV13').value=a.findingType==='CAP'?'CAR':a.findingType;
+    if(['Low','Medium','High'].includes(a.severity))adhocGetV13_('adhocSeverityV13').value=a.severity;
+    if(a.suggestedItem||a.suggestedSection)adhocGetV13_('adhocItemV13').value=[a.suggestedSection,a.suggestedItem].filter(Boolean).join(' - ').slice(0,250);
+    if(a.observation||a.actionRequired)adhocGetV13_('adhocActionV13').value=[a.observation,a.actionRequired].filter(Boolean).join(' — ');
+    if(a.rootCauseSuggestion)adhocGetV13_('adhocRootV13').value=a.rootCauseSuggestion;
+    if(a.suggestedComment&&!ph.comment)ph.comment=a.suggestedComment;
+    adhocToastV13_('Cadangan AI dimasukkan. Semak semuanya sebelum hantar.','success');adhocRenderV13_();
+  }catch(e){adhocToastV13_('AI: '+(e.message||'gagal'),'error');}
+  finally{btn.disabled=false;btn.textContent='🤖 Semak Gambar dengan AI';}
+}
+function adhocPayloadV13_(){return{
+  reporterName:adhocGetV13_('adhocReporterV13').value.trim(),station:adhocGetV13_('adhocStationV13').value,
+  type:adhocGetV13_('adhocTypeV13').value,severity:adhocGetV13_('adhocSeverityV13').value,
+  itemKey:adhocGetV13_('adhocItemV13').value.trim(),action:adhocGetV13_('adhocActionV13').value.trim(),
+  rootCause:adhocGetV13_('adhocRootV13').value.trim(),dueDate:adhocGetV13_('adhocDueV13').value,
+  reportLat:adhocGpsV13_?String(adhocGpsV13_.lat):'',reportLng:adhocGpsV13_?String(adhocGpsV13_.lng):'',
+  reportGpsAccuracy:adhocGpsV13_?String(adhocGpsV13_.accuracy):'',clientSubmissionId:adhocIdV13_||(adhocIdV13_=adhocNewIdV13_())};}
+function adhocValidateV13_(p){
+  if(p.reporterName.length<2)return 'Isi nama sebenar pelapor';
+  if(!p.station)return 'Pilih stesen';
+  if(p.itemKey.length<3)return 'Isi kategori/item isu';
+  if(p.action.length<5)return 'Isi keterangan/tindakan diperlukan';
+  if(!adhocPhotosV13_.length)return 'Muat naik sekurang-kurangnya satu gambar';
+  return '';
+}
+function adhocLikelyPermanentV13_(err){
+  if(err?.isTransportError)return false;
+  if(err?.serverResponse)return err.retryable!==true;
+  return /INVALID_|PHOTO_NOT_|Too many photos|Unknown action|NOT_ALLOWED|KONFIGURASI_BELUM_LENGKAP|Missing required/i.test(String(err?.message||err));
+}
+async function adhocSendNowV13_(record,button){
+  const photos=Array.isArray(record.photos)?record.photos:[];
+  const uploaded=[];const receiptMap=record.uploadedPhotoMap||{};
+  for(let i=0;i<photos.length;i++){
+    const photo=photos[i],key=record.id+'-ADHOC-'+(i+1);let receipt=receiptMap[key];
+    if(!receipt||!receipt.fileId){
+      if(button)button.textContent='⏳ Gambar '+(i+1)+'/'+photos.length;
+      const r=await adhocPostV13_({action:'uploadAdhocFindingPhoto',reporterName:record.payload.reporterName,
+        station:record.payload.station,month:['January','February','March','April','May','June','July','August','September','October','November','December'][new Date(record.createdAt||Date.now()).getMonth()],
+        index:i+1,base64:photo.data,comment:photo.comment||'',uploadKey:key});
+      if(!r.fileId)throw Error('Pelayan tidak mengembalikan ID gambar');
+      receipt={fileId:r.fileId};receiptMap[key]=receipt;record.uploadedPhotoMap=receiptMap;
+      await adhocTxV13_('readwrite','put',record);
+    }
+    uploaded.push({fileId:receipt.fileId,comment:photo.comment||''});
+  }
+  if(button)button.textContent='⏳ Menghantar laporan...';
+  const result=await adhocPostV13_({...record.payload,action:'submitAdhocFinding',photos:JSON.stringify(uploaded)});
+  if(!result.findingId)throw Error('Pelayan belum mengesahkan ID laporan');
+  return result;
+}
+async function adhocSubmitV13_(){
+  if(adhocBusyV13_)return;
+  const payload=adhocPayloadV13_(),error=adhocValidateV13_(payload);
+  if(error)return adhocToastV13_(error,'error');
+  adhocBusyV13_=true;const button=adhocGetV13_('adhocSubmitV13');button.disabled=true;
+  try{
+    localStorage.setItem('dklpo_adhoc_reporter_v13',payload.reporterName);
+    let record=await adhocTxV13_('readonly','get',payload.clientSubmissionId);
+    record=record?.type==='ADHOC_V13'?record:{id:payload.clientSubmissionId,type:'ADHOC_V13',payload,
+      createdAt:new Date().toISOString(),photos:adhocPhotosV13_.map(x=>({...x})),uploadedPhotoMap:{},status:'QUEUED',attempts:0,nextAttemptAt:'',lastError:''};
+    if(!navigator.onLine){await adhocTxV13_('readwrite','put',record);
+      adhocToastV13_('Tiada Internet. Laporan selamat disimpan di peranti. Gunakan Butang Cuba Hantar apabila online.','info');
+      adhocClearV13_(true);return;}
+    record.status='DIRECT_SENDING';record.leaseUntil=Date.now()+240000;
+    await adhocTxV13_('readwrite','put',record);
+    try{
+      const r=await adhocSendNowV13_(record,button);
+      await adhocTxV13_('readwrite','delete',record.id);
+      adhocToastV13_('Laporan disahkan berjaya: '+r.findingId,'success');
+      adhocClearV13_(true);return;
+    }catch(e){
+      record.leaseUntil=0;record.lastError=String(e?.message||e);record.lastErrorAt=new Date().toISOString();
+      record.status=adhocLikelyPermanentV13_(e)?'DEAD_LETTER':'QUEUED';record.nextAttemptAt='';
+      await adhocTxV13_('readwrite','put',record);
+      if(record.status==='DEAD_LETTER')throw Error('Pelayan menolak laporan: '+record.lastError+' (semak dalam Laporan Tertangguh).');
+      adhocToastV13_('Pelayan belum mengesahkan laporan. Laporan tersimpan untuk cubaan semula.','info');
+      adhocClearV13_(true);return;
+    }
+  }catch(e){adhocToastV13_(e?.message||'Gagal menghantar laporan','error');}
+  finally{adhocBusyV13_=false;button.disabled=false;button.textContent='🚨 Hantar Laporan';}
+}
+function adhocClearV13_(close=false){
+  adhocPhotosV13_=[];adhocIdV13_=adhocNewIdV13_();adhocRenderV13_();adhocGpsV13_=null;
+  adhocGetV13_('adhocGpsStatusV13').textContent='GPS belum direkodkan';
+  ['adhocStationV13','adhocItemV13','adhocActionV13','adhocRootV13','adhocDueV13'].forEach(id=>adhocGetV13_(id).value='');
+  if(close){const page=adhocGetV13_('pageAdhocV13');page.classList.remove('active');page.setAttribute('aria-hidden','true');
+    document.body.classList.remove('adhoc-open');if(selectedPic)refreshAll({silent:true});}
+}
+async function adhocReviewQueueV13_(notify=true){
+  try{
+    const rows=(await adhocTxV13_('readonly','getAll')).filter(x=>x?.type==='ADHOC_V13');
+    const pending=rows.filter(x=>x.status!=='DEAD_LETTER'),stopped=rows.filter(x=>x.status==='DEAD_LETTER');
+    const el=adhocGetV13_('adhocQueueStatusV13');el.hidden=rows.length===0;
+    el.textContent=rows.length?pending.length+' laporan menunggu penghantaran; '+stopped.length+' laporan perlu disemak (ditolak pelayan). '+
+      stopped.map(x=>'ID '+x.id+' — '+(x.lastError||'Ralat')).join('; '):'';
+    if(notify)adhocToastV13_(rows.length?el.textContent:'Tiada laporan tertangguh.');
+    return rows;
+  }catch(e){adhocToastV13_('Barisan tidak dapat dibaca: '+e.message,'error');return[];}
+}
+async function adhocSyncQueuedV13_(){
+  if(adhocSyncBusyV13_||adhocBusyV13_)return;
+  if(!navigator.onLine)return adhocToastV13_('Sambung Internet sebelum cuba hantar.','info');
+  adhocSyncBusyV13_=true;let succeeded=0,failed=0;
+  try{
+    const rows=await adhocReviewQueueV13_(false);
+    const button=adhocGetV13_('adhocSubmitV13');
+    for(const record of rows){
+      if(record.status==='DEAD_LETTER')continue;
+      if(record.status==='DIRECT_SENDING'&&Number(record.leaseUntil||0)>Date.now())continue;
+      record.status='DIRECT_SENDING';record.leaseUntil=Date.now()+240000;
+      await adhocTxV13_('readwrite','put',record);
+      try{const res=await adhocSendNowV13_(record,button);await adhocTxV13_('readwrite','delete',record.id);succeeded++;
+        adhocToastV13_('Laporan disahkan: '+res.findingId,'success');}
+      catch(e){failed++;record.leaseUntil=0;record.lastError=String(e?.message||e);
+        record.status=adhocLikelyPermanentV13_(e)?'DEAD_LETTER':'QUEUED';await adhocTxV13_('readwrite','put',record);}
+    }
+    await adhocReviewQueueV13_(false);
+    adhocToastV13_('Sync laporan: '+succeeded+' berjaya, '+failed+' belum berjaya.',failed?'info':'success');
+    if(succeeded&&selectedPic)await refreshAll({silent:true});
+    button.textContent='🚨 Hantar Laporan';
+  }catch(e){adhocToastV13_('Gagal sync: '+(e?.message||e),'error');}
+  finally{adhocSyncBusyV13_=false;}
+}
+// A single HTML can open the report through a query string without requiring report.html.
+if(new URLSearchParams(location.search).get('report')==='adhoc'){
+  const u=new URL(location.href);u.searchParams.delete('report');history.replaceState(history.state,'',u.pathname+u.search+u.hash);
+  adhocOpenV13_();
+}
+
+
 </script>
 </body>
 </html>
