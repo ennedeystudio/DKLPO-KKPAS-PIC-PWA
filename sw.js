@@ -1,10 +1,10 @@
 /* Portal PIC DKLPO — service worker khusus PWA PIC.
-   Pemeriksaan bulanan dan borang NCR/CAR/PAR berada dalam portal pemeriksa,
-   bukan sebahagian daripada aplikasi PIC ini.
+   Pemeriksaan bulanan kekal dalam portal pemeriksa.
+   Borang laporan NCR/CAR/PAR tersendiri kini TERBENAM dalam index.html PIC.
    Data/draf/bukti PIC dalam IndexedDB tidak dipadam sewaktu naik taraf.
    Queue pembetulan PIC disegerakkan oleh index.html semasa portal dibuka dan online.
 */
-const CACHE_NAME = 'kkpas-pic-cache-v15-pic-only-20261030';
+const CACHE_NAME = 'kkpas-pic-cache-v16-integrated-ncr-20261030';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
 const CACHE_PREFIXES = ['kkpas-pic-cache-', 'kkpas-pwa-'];
 
@@ -29,7 +29,7 @@ self.addEventListener('activate', event => {
   })());
 });
 
-// Hanya halaman utama PIC dan manifest dicache; jangan pintas portal pemeriksa.
+// Cache halaman PIC dengan borang NCR/CAR/PAR terbina dalam dan manifest; jangan pintas portal pemeriksa.
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
