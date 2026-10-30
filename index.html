@@ -1356,6 +1356,9 @@ body.adhoc-open{overflow:hidden}
 
     <footer class="pic-login-footer">
       <div class="pic-login-release">
+        <b>v19</b>
+        <button type="button" class="pic-release-check" onclick="picCheckUpdateV18_()">↻ Semak Versi</button>
+      </div>
       <span class="pic-release-status" role="status" aria-live="polite"></span>
       <div>DKLPO Safety Inspection · KKPAS</div>
       <div class="pic-login-copyright">Copyright © Ennedey 2026 @ Dklpo</div>
@@ -3386,7 +3389,7 @@ async function submitRectification() {
 /* ============ OPTIONAL PWA INSTALL & OFFLINE SHELL ============ */
 (function initPwaInstallation_() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' }).catch(err => {
       console.warn('PIC service worker registration failed:', err);
     });
   }
@@ -3793,7 +3796,7 @@ async function adhocReviewAiV13_(ph,btn){
 function adhocPayloadV13_(){return{
   reporterName:adhocGetV13_('adhocReporterV13').value.trim(),station:adhocGetV13_('adhocStationV13').value,
   type:adhocGetV13_('adhocTypeV13').value,severity:adhocGetV13_('adhocSeverityV13').value,
-  itemKey:adhocGetV13_('adhocItemV13').value.trim(),action:adhocGetV13_('adhocActionV13').value.trim(),
+  itemKey:adhocGetV13_('adhocItemV13').value.trim(),issueAction:adhocGetV13_('adhocActionV13').value.trim(),
   rootCause:adhocGetV13_('adhocRootV13').value.trim(),dueDate:adhocGetV13_('adhocDueV13').value,
   reportLat:adhocGpsV13_?String(adhocGpsV13_.lat):'',reportLng:adhocGpsV13_?String(adhocGpsV13_.lng):'',
   reportGpsAccuracy:adhocGpsV13_?String(adhocGpsV13_.accuracy):'',clientSubmissionId:adhocIdV13_||(adhocIdV13_=adhocNewIdV13_())};}
@@ -3801,7 +3804,7 @@ function adhocValidateV13_(p){
   if(p.reporterName.length<2)return 'Isi nama sebenar pelapor';
   if(!p.station)return 'Pilih stesen';
   if(p.itemKey.length<3)return 'Isi kategori/item isu';
-  if(p.action.length<5)return 'Isi keterangan/tindakan diperlukan';
+  if(p.issueAction.length<5)return 'Isi keterangan/tindakan diperlukan';
   if(!adhocPhotosV13_.length)return 'Muat naik sekurang-kurangnya satu gambar';
   return '';
 }
@@ -3827,7 +3830,7 @@ async function adhocSendNowV13_(record,button){
     uploaded.push({fileId:receipt.fileId,comment:photo.comment||''});
   }
   if(button)button.textContent='⏳ Menghantar laporan...';
-  const result=await adhocPostV13_({...record.payload,action:'submitAdhocFinding',photos:JSON.stringify(uploaded)});
+  const result=await adhocPostV13_({...record.payload,issueAction:record.payload.issueAction||record.payload.action||'',action:'submitAdhocFinding',photos:JSON.stringify(uploaded)});
   if(!result.findingId)throw Error('Pelayan belum mengesahkan ID laporan');
   return result;
 }
@@ -4159,7 +4162,7 @@ async function picCheckUpdateV18_(){
         history.back();
       }else{
         lastExitBackAt=now;
-        announceExit();
+        showToast(t('Tekan Kembali sekali lagi untuk keluar', 'Press Back again to exit'), '', 'info');
         push(capture(),'guard');
       }
       return;
