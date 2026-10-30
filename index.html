@@ -1261,9 +1261,6 @@ body.adhoc-open{overflow:hidden}
     </button>
 
 <button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR</button>
-
-<div class="pic-release-info"><b>Portal PIC PWA • NCR v18</b> <span>(30/10/2026)</span>
-  <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()">↻ Semak Kemas Kini</button>
   <span class="pic-release-status" role="status" aria-live="polite"></span></div>
 <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">
   <div>DKLPO Safety Inspection · KKPAS v2.1</div>
@@ -1346,10 +1343,6 @@ body.adhoc-open{overflow:hidden}
 
 <!-- Findings List Container -->
     <div id="tabContent"></div>
-
-    <div class="pic-release-info"><b>Portal PIC PWA • NCR v18</b> <span>(30/10/2026)</span>
-  <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()">↻ Semak Kemas Kini</button>
-  <span class="pic-release-status" role="status" aria-live="polite"></span></div>
 
     <!-- Footer Copyright -->
     <div style="text-align:center;padding:24px 0 16px;font-size:11px;color:var(--muted);opacity:0.85;font-weight:600;">
@@ -4054,10 +4047,6 @@ async function picCheckUpdateV18_(){
       return true;
     }catch(err){console.error('[PIC Back] Could not restore navigation:',err);return false;}
     finally{suppressed=false;}
-  }
-  function announceExit(){
-    showToast(t('Tekan Kembali Sekali Lagi','Press Back Again'),
-      t('Tekan Back sekali lagi dalam 2.2 saat untuk keluar.','Press Back once more within 2.2 seconds to exit.'),'info');
   }
   async function handlePop(event){
     const target=event.state && event.state[NAV_KEY];
