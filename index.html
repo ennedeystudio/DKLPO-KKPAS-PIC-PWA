@@ -1260,7 +1260,7 @@ body.adhoc-open{overflow:hidden}
       <span data-ms="Masuk Portal" data-en="Enter Portal">Masuk Portal</span> →
     </button>
 
-<button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR (Tanpa Login)" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR (Tanpa Login)</button>
+<button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR</button>
 
 <div class="pic-release-info"><b>Portal PIC PWA • NCR v18</b> <span>(30/10/2026)</span>
   <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()">↻ Semak Kemas Kini</button>
@@ -1301,7 +1301,7 @@ body.adhoc-open{overflow:hidden}
   </div>
 
 <div class="content">
-    <button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR (Tanpa Login)" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR (Tanpa Login)</button>
+    <button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR </button>
 
     <!-- Same-station collaboration — the named assignee remains the primary PIC -->
     <div id="sharedStationBanner" class="banner info" style="display:none" aria-live="polite"></div>
@@ -1534,7 +1534,7 @@ body.adhoc-open{overflow:hidden}
       <div class="form-group"><label>Lokasi GPS (pilihan)</label><button type="button" class="photo-btn" onclick="adhocCaptureGpsV13_()">📍 Ambil GPS sekarang</button><div id="adhocGpsStatusV13" style="margin-top:8px;font-size:12px">GPS belum direkodkan</div></div>
     </div>
     <div class="card-mobile">
-      <label style="display:block;margin-bottom:8px">Gambar bukti isu * (had sama seperti pemeriksaan: 12 gambar, 250 KB setiap gambar selepas mampatan)</label>
+      <label style="display:block;margin-bottom:8px">Gambar bukti isu * (had sama seperti pemeriksaan: 12 gambar</label>
       <div class="photo-actions">
         <button type="button" class="photo-btn" onclick="document.getElementById('adhocCameraV13').click()">📷 Kamera</button>
         <button type="button" class="photo-btn" onclick="document.getElementById('adhocGalleryV13').click()">🖼️ Galeri</button>
@@ -1994,13 +1994,6 @@ function updateSharedStationBanner_() {
     el.textContent = t('Tiada stesen didaftarkan. Minta Admin kemas kini profil PIC anda.', 'No station is registered. Ask Admin to update your PIC profile.');
     return;
   }
-  const shared = allFindings.filter(f => canAssistFinding_(f, selectedPic) &&
-    String(f.picId || '').trim() && String(f.picId || '').trim() !== String(selectedPic.picId || '').trim());
-  el.style.display = 'block';
-  el.textContent = '🤝 ' + t('Tugasan bersama stesen', 'Shared station tasks') + ': ' +
-    stations.join(', ') + '. ' + t('PIC aktif bagi stesen ini boleh menghantar bukti, walaupun laporan ditugaskan kepada PIC utama yang lain. Rekod Admin kekal menyimpan PIC utama dan nama penghantar sebenar.',
-    'Active PICs at this station may submit evidence even if a different primary PIC is assigned. The primary assignee and actual submitter are recorded separately.') +
-    ' ' + shared.length + ' ' + t('tugasan ditugaskan kepada PIC lain dalam senarai anda.', 'listed tasks have another primary PIC.');
 }
 
 async function refreshAll(options = {}) {
@@ -2721,7 +2714,7 @@ async function openRectify(findingId) {
         <span>${t('Gambar Bukti Kerja Siap', 'Completed Work Evidence Photos')} <span style="color:var(--bad)">*</span></span>
         <span style="font-size:11px;color:var(--brand);font-weight:700;">✏️ ${t('Klik "Tanda" pada gambar untuk melukis panah/bulatan', 'Tap "Markup" on photo to draw arrows/circles')}</span>
       </label>
-      <div class="hint">${t('Maksimum 12 gambar. Gambar dimampatkan secara automatik (~220KB).', 'Maximum 12 photos. Auto-compressed (~220KB).')}</div>
+      <div class="hint">${t('Maksimum 12 gambar.', 'Maximum 12 photos.')}</div>
       <input type="file" id="rectPhotos" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="handlePhotoPick(event)"/>
       <div id="photoGrid" class="photo-grid" style="margin-top:10px"></div>
     </div>
@@ -3642,7 +3635,7 @@ async function adhocCompressFileV13_(file){
     if(Math.min(w,h)<=160)break;
     w=Math.max(1,Math.round(w*.82));h=Math.max(1,Math.round(h*.82));
   }
-  throw Error('Gambar tidak dapat dimampatkan kepada 250 KB');
+  throw Error('Gambar tidak dapat dimampatkan');
 }
 async function adhocAddPhotosV13_(input){
   const files=Array.from(input.files||[]);input.value='';
