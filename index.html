@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="ms" data-pic-release="PIC-PWA-NCR-V18-SMARTBACK-20261030">
+<html lang="ms" data-pic-release="PIC-PWA-NCR-V19-LOGIN-20261030">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="referrer" content="no-referrer"/>
 <meta name="theme-color" content="#090d16"/>
 <title>DKLPO · Portal PIC • NCR Terbina Dalam</title>
-<meta name="dklpo-pic-release" content="PIC-PWA-NCR-V18-SMARTBACK-20261030">
+<meta name="dklpo-pic-release" content="PIC-PWA-NCR-V19-LOGIN-20261030">
 <link rel="icon" type="image/png" href="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png"/>
 <!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json">
@@ -1212,6 +1212,84 @@ body.adhoc-open{overflow:hidden}
 .pic-release-status{display:block;font-size:11px;margin-top:4px;overflow-wrap:anywhere}
 @media(max-width:370px){.pic-release-check{margin-left:0}}
 </style>
+<style>
+
+/* v19 — restore LOGIN structure and calm mobile first design (does not change application logic) */
+#loginScreen.pic-login-screen{
+  box-sizing:border-box; width:100%; min-height:100vh; min-height:100dvh;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  padding:clamp(14px,3.5vh,32px) 16px calc(20px + env(safe-area-inset-bottom));
+  background:radial-gradient(ellipse 90% 50% at 50% 0%,rgba(16,185,129,.18),transparent 85%),var(--bg);
+}
+.pic-login-screen .login-card{
+  box-sizing:border-box;display:block;flex:0 1 auto;width:100%;min-width:0;max-width:440px;
+  margin:0 auto;padding:20px 22px 18px;border-radius:24px;
+  background:linear-gradient(160deg,var(--surface) 0%,var(--surface-elevated) 100%);
+  border:1px solid var(--stroke-strong);box-shadow:0 18px 48px rgba(0,0,0,.25);
+}
+.pic-login-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.pic-login-brand{font-size:10.5px;font-weight:800;letter-spacing:.8px;color:var(--muted);white-space:nowrap}
+.pic-login-brand-dot,.pic-login-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand);margin-right:6px;vertical-align:middle;box-shadow:0 0 0 3px var(--brand-glow)}
+.pic-login-brand-sep{opacity:.4;padding:0 4px}
+.pic-login-tools{display:flex;gap:7px;flex-shrink:0}
+.pic-login-tools .icon-btn{width:34px;height:34px;border-radius:10px;font-size:12px}
+.pic-login-hero{text-align:center;padding:3px 2px 18px}
+.pic-login-logo{position:relative;width:70px;height:70px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;
+  background:linear-gradient(135deg,#065f46,#0f172a);border:1px solid rgba(16,185,129,.45);overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.2)}
+.pic-login-logo .logo-big{position:absolute;inset:0;display:block;width:100%;height:100%;border:none;border-radius:inherit;object-fit:cover;margin:0;box-shadow:none;background:transparent}
+.pic-login-logo-fallback{display:flex;align-items:center;flex-direction:column;justify-content:center;color:white;line-height:1.1;font-weight:900;font-size:24px}
+.pic-login-logo-fallback small{font-size:9px;letter-spacing:1.4px;margin-top:2px}
+.pic-login-eyebrow{color:var(--brand);font-size:9.5px;font-weight:900;letter-spacing:1.3px;margin-bottom:5px}
+.pic-login-hero h1{margin:0 0 5px;font-size:clamp(21px,5vw,24px);line-height:1.2;font-weight:850;letter-spacing:-.55px;color:var(--text)}
+.pic-login-hero p{margin:0 auto;max-width:315px;font-size:12.5px;line-height:1.5;color:var(--muted);text-align:center}
+.pic-login-profile{padding-top:15px;border-top:1px solid var(--stroke-strong)}
+.pic-login-section-heading{display:flex;align-items:center;gap:8px;margin-bottom:13px;font-size:13px;color:var(--text)}
+.pic-login-step{display:grid;place-items:center;width:23px;height:23px;border-radius:8px;color:var(--brand);background:var(--brand-glow);font-size:10px;font-weight:900}
+.pic-login-field{margin-bottom:10px}
+.pic-login-field label{font-size:10px;letter-spacing:.65px;margin-bottom:6px}
+.pic-login-search-wrap{position:relative;min-width:0}
+.pic-login-search-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}
+.pic-login-search-wrap .input{width:100%;height:46px;min-width:0;padding:11px 13px 11px 40px;font-size:13px;background:var(--bg);border:1px solid var(--stroke-strong);border-radius:12px}
+.pic-login-screen .pic-list{margin-top:0;max-height:min(30vh,206px);min-height:66px;background:var(--bg);border:1px solid var(--stroke-strong);border-radius:12px;overflow-y:auto}
+.pic-login-screen .pic-item{min-height:60px;padding:9px 12px;gap:10px}
+.pic-login-screen .pic-avatar{width:36px;height:36px;font-size:12px}
+.pic-login-screen .pic-meta .name{font-size:13px}
+.pic-login-screen .pic-meta .station{font-size:11px}
+.pic-login-screen .empty-dir{padding:19px 10px;font-size:12px;line-height:1.5}
+.pic-login-remember{display:flex;align-items:center;gap:10px;margin:12px 0 14px;cursor:pointer;color:var(--muted);font-size:12px;line-height:1.4}
+.pic-login-remember input{width:17px;height:17px;flex:0 0 auto;accent-color:var(--brand);cursor:pointer}
+.pic-login-actions .pic-login-enter{min-height:48px;font-size:14px;gap:10px;border-radius:12px}
+.pic-login-or{display:flex;align-items:center;gap:12px;margin:12px 0;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:1px}
+.pic-login-or::before,.pic-login-or::after{content:"";height:1px;background:var(--stroke-strong);flex:1}
+.pic-login-screen .pic-login-report{display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;margin:0;padding:11px 12px;
+  background:linear-gradient(125deg,#c2410c,#b91c1c);border:1px solid rgba(251,146,60,.45);border-radius:12px;color:#fff;font-weight:800;font-size:13px;line-height:1.3}
+.pic-login-report-hint{font-size:10.5px;color:var(--muted);text-align:center;margin-top:7px}
+.pic-login-footer{margin-top:15px;padding-top:12px;border-top:1px solid var(--stroke);text-align:center;font-size:10px;line-height:1.65;color:var(--muted)}
+.pic-login-release{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 9px;margin-bottom:5px}
+.pic-login-release b{font-size:10.5px;color:var(--text)}
+.pic-login-release .pic-release-check{margin:0;min-height:30px;font-size:10px;padding:5px 9px}
+.pic-login-copyright{opacity:.75}
+.pic-login-footer .pic-release-status:not(:empty){display:block;margin:6px auto 8px;max-width:340px;color:var(--brand)}
+[data-theme="light"] #loginScreen.pic-login-screen{background:radial-gradient(ellipse 90% 45% at 50% 0%,rgba(16,185,129,.10),transparent 85%),var(--bg)}
+[data-theme="light"] .pic-login-screen .login-card{box-shadow:0 16px 40px rgba(15,23,42,.08)}
+@media(max-width:390px){
+  #loginScreen.pic-login-screen{padding:12px 13px calc(16px + env(safe-area-inset-bottom))}
+  .pic-login-screen .login-card{padding:16px 17px 15px;border-radius:21px}
+  .pic-login-hero{padding-bottom:15px}
+  .pic-login-logo{width:62px;height:62px;margin-bottom:9px;border-radius:17px}
+  .pic-login-profile{padding-top:13px}
+  .pic-login-section-heading{margin-bottom:9px}
+  .pic-login-remember{margin:9px 0 11px}
+  .pic-login-or{margin:9px 0}
+  .pic-login-footer{margin-top:12px;padding-top:10px}
+}
+@media(max-height:670px){
+  #loginScreen.pic-login-screen{justify-content:flex-start}
+  .pic-login-hero{padding-bottom:12px}
+  .pic-login-screen .pic-list{max-height:160px}
+}
+
+</style>
 </head>
 <body>
 <!-- ============ KKPAS INSTALL GATE ============ -->
@@ -1229,44 +1307,64 @@ body.adhoc-open{overflow:hidden}
     <p class="kkpas-install-note" data-ms="Pemasangan aplikasi memerlukan pengesahan dari Android/iOS." data-en="App installation requires permission from Android/iOS.">Pemasangan aplikasi memerlukan pengesahan dari Android/iOS.</p>
   </div>
 </div>
-<!-- ============ LOGIN SCREEN ============ -->
-<div id="loginScreen" class="login-wrap">
-  <div class="login-card">
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px;">
-      <button class="icon-btn" onclick="toggleTheme()" id="btnThemeLogin" title="Tukar Tema">🌙</button>
-      <button class="icon-btn" onclick="toggleLang()" id="btnLangLogin" title="Tukar Bahasa">BM</button>
-    </div>
-    <img class="logo-big" src="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png" alt="DKLPO"/>
-    <h1 data-ms="Portal PIC DKLPO" data-en="DKLPO PIC Portal">Portal PIC DKLPO</h1>
-    <p data-ms="Pilih nama anda untuk menyemak & menghantar bukti tindakan pembetulan." data-en="Select your name to review & submit corrective action evidence.">
-      Pilih nama anda untuk menyemak & menghantar bukti tindakan pembetulan.
-    </p>
-
-<div class="field">
-      <label data-ms="Cari nama atau stesen PIC" data-en="Search PIC name or station">Cari nama atau stesen PIC</label>
-      <input id="picSearch" class="input" type="text" placeholder="Contoh: Ahmad / Boiler House..." autocomplete="off"/>
+<!-- ============ LOGIN SCREEN — RESTORED / RESPONSIVE v19 ============ -->
+<div id="loginScreen" class="login-wrap pic-login-screen">
+  <main class="login-card" aria-label="Portal PIC DKLPO">
+    <div class="pic-login-topline">
+      <span class="pic-login-brand"><span class="pic-login-brand-dot" aria-hidden="true"></span> DKLPO <span class="pic-login-brand-sep">/</span> KKPAS</span>
+      <div class="pic-login-tools">
+        <button class="icon-btn" type="button" onclick="toggleTheme()" id="btnThemeLogin" title="Tukar Tema" aria-label="Tukar tema">🌙</button>
+        <button class="icon-btn" type="button" onclick="toggleLang()" id="btnLangLogin" title="Tukar Bahasa" aria-label="Tukar bahasa">BM</button>
+      </div>
     </div>
 
-<div id="picDirectory" class="pic-list">
-      <div class="empty-dir">⏳ <span data-ms="Memuatkan direktori..." data-en="Loading directory...">Memuatkan direktori...</span></div>
+    <header class="pic-login-hero">
+      <div class="pic-login-logo" aria-label="Logo DKLPO">
+        <span class="pic-login-logo-fallback" aria-hidden="true"><span>🛡</span><small>DKLPO</small></span>
+        <img class="logo-big" src="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png" alt="Logo DKLPO" onerror="this.style.display='none'"/>
+      </div>
+      <div class="pic-login-eyebrow" data-ms="PORTAL TINDAKAN PEMBETULAN" data-en="CORRECTIVE ACTION PORTAL">PORTAL TINDAKAN PEMBETULAN</div>
+      <h1 data-ms="Portal PIC DKLPO" data-en="DKLPO PIC Portal">Portal PIC DKLPO</h1>
+      <p data-ms="Pilih nama anda untuk melihat tugasan serta menghantar bukti tindakan pembetulan." data-en="Select your name to review tasks and submit corrective action evidence.">Pilih nama anda untuk melihat tugasan serta menghantar bukti tindakan pembetulan.</p>
+    </header>
+
+    <section class="pic-login-profile" aria-label="Pilih profil PIC">
+      <div class="pic-login-section-heading"><span class="pic-login-step">01</span><strong data-ms="Pilih Profil PIC" data-en="Select PIC Profile">Pilih Profil PIC</strong></div>
+      <div class="field pic-login-field">
+        <label for="picSearch" data-ms="Cari nama atau stesen PIC" data-en="Search PIC name or station">Cari nama atau stesen PIC</label>
+        <div class="pic-login-search-wrap">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg>
+          <input id="picSearch" class="input" type="search" placeholder="Contoh: Ahmad / Boiler House..." autocomplete="off" aria-label="Cari PIC"/>
+        </div>
+      </div>
+      <div id="picDirectory" class="pic-list" aria-label="Senarai nama PIC">
+        <div class="empty-dir">⏳ <span data-ms="Memuatkan direktori..." data-en="Loading directory...">Memuatkan direktori...</span></div>
+      </div>
+      <label class="pic-login-remember" for="rememberDevice">
+        <input id="rememberDevice" type="checkbox" checked/>
+        <span data-ms="Ingat profil saya pada peranti ini" data-en="Remember my profile on this device">Ingat profil saya pada peranti ini</span>
+      </label>
+    </section>
+
+    <div class="pic-login-actions">
+      <button id="btnEnter" class="btn primary block pic-login-enter" disabled onclick="enterPortal()" type="button">
+        <span data-ms="Masuk Portal PIC" data-en="Enter PIC Portal">Masuk Portal PIC</span><span aria-hidden="true">→</span>
+      </button>
+      <div class="pic-login-or" aria-hidden="true"><span data-ms="ATAU" data-en="OR">ATAU</span></div>
+      <button type="button" class="btn block pic-public-report pic-login-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR</button>
+      <div class="pic-login-report-hint" data-ms="Laporan boleh dibuat tanpa log masuk sebagai PIC." data-en="You can submit a report without signing in as a PIC.">Laporan boleh dibuat tanpa log masuk sebagai PIC.</div>
     </div>
 
-<div class="remember">
-      <input id="rememberDevice" type="checkbox" checked/>
-      <label for="rememberDevice" style="margin:0;cursor:pointer;" data-ms="Ingat profil saya pada peranti ini" data-en="Remember my profile on this device">Ingat profil saya pada peranti ini</label>
-    </div>
-
-<button id="btnEnter" class="btn primary block" disabled onclick="enterPortal()">
-      <span data-ms="Masuk Portal" data-en="Enter Portal">Masuk Portal</span> →
-    </button>
-
-<button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR</button>
-  <span class="pic-release-status" role="status" aria-live="polite"></span></div>
-<div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">
-  <div>DKLPO Safety Inspection · KKPAS v2.1</div>
-  <div style="font-weight:600;opacity:0.85;">Copyright © Ennedey 2026 @ Dklpo</div>
-</div>
-  </div>
+    <footer class="pic-login-footer">
+      <div class="pic-login-release">
+        <span><span class="pic-login-live-dot" aria-hidden="true"></span><b>Portal PIC PWA · v19</b></span>
+        <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()" data-ms="↻ Semak Kemas Kini" data-en="↻ Check for Updates">↻ Semak Kemas Kini</button>
+      </div>
+      <span class="pic-release-status" role="status" aria-live="polite"></span>
+      <div>DKLPO Safety Inspection · KKPAS</div>
+      <div class="pic-login-copyright">Copyright © Ennedey 2026 @ Dklpo</div>
+    </footer>
+  </main>
 </div>
 
 <!-- ============ MAIN APP ============ -->
@@ -3819,8 +3917,8 @@ if(new URLSearchParams(location.search).get('report')==='adhoc'){
 
 </script>
 <script>
-/* PIC PWA v18 version self-check: only navigation HTML, never delete drafts, IndexedDB or offlineQueue. */
-const PIC_BUILD_V18_ = 'PIC-PWA-NCR-V18-SMARTBACK-20261030';
+/* PIC PWA v19 version self-check: only navigation HTML, never delete drafts, IndexedDB or offlineQueue. */
+const PIC_BUILD_V18_ = 'PIC-PWA-NCR-V19-LOGIN-20261030';
 async function picCheckUpdateV18_(){
   const msgs=Array.from(document.querySelectorAll('.pic-release-status'));
   const setMsg=msg=>msgs.forEach(el=>el.textContent=msg);
@@ -3834,7 +3932,7 @@ async function picCheckUpdateV18_(){
     const m=html.match(/<meta\s+name=["']dklpo-pic-release["']\s+content=["']([^"']+)["']/i);
     const current=m?.[1]||'';
     if(!current){setMsg('Pelayan masih menggunakan fail lama/tidak dikenal pasti. Pastikan index.html baharu telah diterbitkan pada GitHub Pages.');return;}
-    if(current===PIC_BUILD_V18_){setMsg('Versi terkini v18 telah aktif.');return;}
+    if(current===PIC_BUILD_V18_){setMsg('Versi terkini v19 telah aktif.');return;}
     setMsg('Versi pelayan berlainan: '+current);
     if(confirm('Versi baru tersedia di pelayan. Jika ada borang belum siap, tekan Cancel untuk simpan dahulu. Muat semula PWA sekarang?')){
       try{const reg=await navigator.serviceWorker?.getRegistration();await reg?.update()}catch(_){/* navigation can proceed */}
