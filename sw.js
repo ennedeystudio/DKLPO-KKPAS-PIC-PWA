@@ -1,10 +1,10 @@
 /* Portal PIC DKLPO — service worker khusus PWA PIC.
    Pemeriksaan bulanan kekal dalam portal pemeriksa.
    Borang laporan NCR/CAR/PAR tersendiri kini TERBENAM dalam index.html PIC.
-   Data/draf/bukti PIC dalam IndexedDB tidak dipadam sewaktu naik taraf.
+   Data/draf/bukti PIC dan laporan tertangguh dalam IndexedDB tidak dipadam sewaktu naik taraf.
    Queue pembetulan PIC disegerakkan oleh index.html semasa portal dibuka dan online.
 */
-const CACHE_NAME = 'kkpas-pic-cache-v16-integrated-ncr-20261030';
+const CACHE_NAME = 'kkpas-pic-cache-v18-smartback-20261030';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
 const CACHE_PREFIXES = ['kkpas-pic-cache-', 'kkpas-pwa-'];
 
