@@ -1147,6 +1147,19 @@ textarea { resize: vertical; min-height: 88px; }
 @media(max-width:500px){.pic-help-actions button{min-height:46px}.pic-help-panel{margin:12px 0}}
 
 </style>
+<style>
+
+/* Queue & Exit — mobile-safe V14 */
+.net-banner{flex-wrap:wrap;justify-content:flex-start;align-content:center}
+#queueBannerText{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+#queueBanner small{flex:1 1 100%;min-width:0;line-height:1.45}
+#queueBanner .btn{flex:0 0 auto;white-space:nowrap}
+.pic-exit-btn{height:38px;min-height:38px;padding:0 11px;border:1px solid rgba(239,68,68,.65);border-radius:11px;
+  background:#b91c1c;color:#fff;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.pic-exit-btn:hover{background:#991b1b}
+@media(max-width:390px){.topbar{gap:6px;padding-left:10px;padding-right:10px}.topbar .logo{width:34px;height:34px}
+  .topbar .icon-btn{width:33px;height:36px}.pic-exit-btn{padding:0 8px;font-size:11px}}
+</style>
 </head>
 <body>
 <!-- ============ KKPAS INSTALL GATE ============ -->
@@ -1216,7 +1229,7 @@ textarea { resize: vertical; min-height: 88px; }
     <button class="icon-btn" onclick="toggleTheme()" id="btnTheme" title="Tukar Tema">🌙</button>
     <button class="icon-btn" onclick="toggleLang()" id="btnLang" title="Bahasa">BM</button>
     <button class="icon-btn" onclick="refreshAll()" id="btnRefresh" title="Segar Semula">🔄</button>
-    <button class="icon-btn" onclick="logout()" title="Log Keluar">🚪</button>
+    <button class="pic-exit-btn" type="button" onclick="logout()" title="Log Keluar / Exit" aria-label="Keluar Portal PIC">Exit</button>
   </div>
 
 <!-- Offline & Pending Sync Queue Banners -->
@@ -1225,6 +1238,7 @@ textarea { resize: vertical; min-height: 88px; }
   </div>
   <div id="queueBanner" class="net-banner queue" style="display:none;">
     <span id="queueBannerText">📤 1 hantaran dalam barisan luar talian</span>
+    <small data-ms="Bukti PIC dihantar semula apabila portal dibuka dan online." data-en="PIC evidence retries when this portal is open and online." style="font-size:11px;opacity:.85">Bukti PIC dihantar semula apabila portal dibuka dan online.</small>
     <button class="btn small" onclick="reviewOfflineQueue()" title="Semak status queue">🔎</button>
     <button class="btn small primary" onclick="processOfflineQueue()" id="btnSyncNow">🔄 Sync</button>
   </div>
@@ -1870,10 +1884,17 @@ function updateSharedStationBanner_() {
     el.textContent = t('Tiada stesen didaftarkan. Minta Admin kemas kini profil PIC anda.', 'No station is registered. Ask Admin to update your PIC profile.');
     return;
   }
+  const shared = allFindings.filter(f => canAssistFinding_(f, selectedPic) &&
+    String(f.picId || '').trim() && String(f.picId || '').trim() !== String(selectedPic.picId || '').trim());
+  el.style.display = 'block';
+  el.textContent = '🤝 ' + t('Tugasan bersama stesen', 'Shared station tasks') + ': ' +
+    stations.join(', ') + '. ' + t('PIC aktif bagi stesen ini boleh menghantar bukti, walaupun laporan ditugaskan kepada PIC utama yang lain. Rekod Admin kekal menyimpan PIC utama dan nama penghantar sebenar.',
+    'Active PICs at this station may submit evidence even if a different primary PIC is assigned. The primary assignee and actual submitter are recorded separately.') +
+    ' ' + shared.length + ' ' + t('tugasan ditugaskan kepada PIC lain dalam senarai anda.', 'listed tasks have another primary PIC.');
 }
 
 async function refreshAll(options = {}) {
-  if (!selectedPic || uploading || syncingOfflineQueue) return;
+  if (!selectedPic || uploading || (syncingOfflineQueue && !options.afterSuccessfulSubmission)) return;
   if (!options.silent) renderSkeletons();
   const requestedPicId = selectedPic.picId;
   const cacheKey = STORE_FINDINGS_CACHE_PREFIX + requestedPicId;
@@ -3139,7 +3160,9 @@ async function submitRectification() {
     );
     closeRectify(false);
     closeDetail();
-    await refreshAll();
+    // Release the upload lock first: refreshAll intentionally skips while uploading=true.
+    uploading = false;
+    await refreshAll({silent:true, afterSuccessfulSubmission:true});
     switchTab('pending');
   } catch (err) {
     hideLoading();
