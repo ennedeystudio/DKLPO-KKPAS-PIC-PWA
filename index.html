@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="ms" data-pic-release="PIC-PWA-NCR-V18-SMARTBACK-20261030">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="referrer" content="no-referrer"/>
 <meta name="theme-color" content="#090d16"/>
-<title>DKLPO · Portal PIC v2.1 — Stesen Bersama</title>
+<title>DKLPO · Portal PIC • NCR Terbina Dalam</title>
+<meta name="dklpo-pic-release" content="PIC-PWA-NCR-V18-SMARTBACK-20261030">
 <link rel="icon" type="image/png" href="https://arleta.site/interactivelink/3333/DKLPO_Master_192.png"/>
 <!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json">
@@ -1203,6 +1204,14 @@ body.adhoc-open{overflow:hidden}
 
 .pic-modal-back{width:auto;min-width:87px;padding:0 10px;font-size:12px;font-weight:800;}
 </style>
+<style>
+.pic-release-info{text-align:center;color:var(--muted);font-size:11px;line-height:1.6;margin:13px auto;padding:10px 6px;border-top:1px solid var(--stroke)}
+.pic-release-info b{color:var(--text)}
+.pic-release-info span{display:inline-block}
+.pic-release-check{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;margin:6px 0 0 8px;border:1px solid var(--stroke-strong);border-radius:9px;background:var(--surface-elevated);color:var(--text);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.pic-release-status{display:block;font-size:11px;margin-top:4px;overflow-wrap:anywhere}
+@media(max-width:370px){.pic-release-check{margin-left:0}}
+</style>
 </head>
 <body>
 <!-- ============ KKPAS INSTALL GATE ============ -->
@@ -1253,6 +1262,9 @@ body.adhoc-open{overflow:hidden}
 
 <button type="button" class="btn block pic-public-report" onclick="adhocOpenV13_()" data-ms="🚨 Lapor NCR / CAR / PAR (Tanpa Login)" data-en="🚨 Report NCR / CAR / PAR (No Login)">🚨 Lapor NCR / CAR / PAR (Tanpa Login)</button>
 
+<div class="pic-release-info"><b>Portal PIC PWA • NCR v18</b> <span>(30/10/2026)</span>
+  <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()">↻ Semak Kemas Kini</button>
+  <span class="pic-release-status" role="status" aria-live="polite"></span></div>
 <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">
   <div>DKLPO Safety Inspection · KKPAS v2.1</div>
   <div style="font-weight:600;opacity:0.85;">Copyright © Ennedey 2026 @ Dklpo</div>
@@ -1334,6 +1346,10 @@ body.adhoc-open{overflow:hidden}
 
 <!-- Findings List Container -->
     <div id="tabContent"></div>
+
+    <div class="pic-release-info"><b>Portal PIC PWA • NCR v18</b> <span>(30/10/2026)</span>
+  <button class="pic-release-check" type="button" onclick="picCheckUpdateV18_()">↻ Semak Kemas Kini</button>
+  <span class="pic-release-status" role="status" aria-live="polite"></span></div>
 
     <!-- Footer Copyright -->
     <div style="text-align:center;padding:24px 0 16px;font-size:11px;color:var(--muted);opacity:0.85;font-weight:600;">
@@ -3245,7 +3261,8 @@ async function submitRectification() {
       throw e;
     }
 
-    await clearSavedDraft(f.findingId);
+    try { await clearSavedDraft(f.findingId); }
+    catch (draftError) { console.warn('Bukti diterima pelayan; gagal buang draf tempatan:', draftError); }
     hideLoading();
     showToast(
       t('Berjaya Dihantar', 'Submitted Successfully'),
@@ -3256,8 +3273,14 @@ async function submitRectification() {
     closeDetail();
     // Release the upload lock first: refreshAll intentionally skips while uploading=true.
     uploading = false;
-    await refreshAll({silent:true, afterSuccessfulSubmission:true});
     switchTab('pending');
+    try { await refreshAll({silent:true, afterSuccessfulSubmission:true}); }
+    catch (refreshError) {
+      console.warn('Bukti diterima pelayan tetapi senarai belum dapat disegarkan:', refreshError);
+      showToast(t('Bukti Diterima', 'Evidence Accepted'),
+        t('Penghantaran berjaya. Senarai belum dapat dikemas kini; tekan butang Refresh apabila online.',
+          'Submission succeeded. The list could not refresh yet; refresh when online.'), 'info');
+    }
   } catch (err) {
     hideLoading();
     // Only uncertain network delivery is queued. Validation/permission rejections are NOT retried forever.
@@ -3807,6 +3830,331 @@ if(new URLSearchParams(location.search).get('report')==='adhoc'){
   adhocOpenV13_();
 }
 
+
+</script>
+<script>
+/* PIC PWA v18 version self-check: only navigation HTML, never delete drafts, IndexedDB or offlineQueue. */
+const PIC_BUILD_V18_ = 'PIC-PWA-NCR-V18-SMARTBACK-20261030';
+async function picCheckUpdateV18_(){
+  const msgs=Array.from(document.querySelectorAll('.pic-release-status'));
+  const setMsg=msg=>msgs.forEach(el=>el.textContent=msg);
+  if(!navigator.onLine){setMsg('Tiada Internet. Sambung talian untuk semak versi.');return;}
+  setMsg('Menyemak versi di GitHub...');
+  try{
+    const url=new URL('./index.html',location.href);url.searchParams.set('check',String(Date.now()));
+    const response=await fetch(url.href,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const html=await response.text();
+    const m=html.match(/<meta\s+name=["']dklpo-pic-release["']\s+content=["']([^"']+)["']/i);
+    const current=m?.[1]||'';
+    if(!current){setMsg('Pelayan masih menggunakan fail lama/tidak dikenal pasti. Pastikan index.html baharu telah diterbitkan pada GitHub Pages.');return;}
+    if(current===PIC_BUILD_V18_){setMsg('Versi terkini v18 telah aktif.');return;}
+    setMsg('Versi pelayan berlainan: '+current);
+    if(confirm('Versi baru tersedia di pelayan. Jika ada borang belum siap, tekan Cancel untuk simpan dahulu. Muat semula PWA sekarang?')){
+      try{const reg=await navigator.serviceWorker?.getRegistration();await reg?.update()}catch(_){/* navigation can proceed */}
+      location.replace(url.href);
+    }
+  }catch(e){setMsg('Gagal semak versi: '+(e?.message||e)+'. Semak sambungan dan URL GitHub Pages.');}
+}
+</script>
+<script>
+/* ============ SMART BACK V18: PWA + browser Android History API ============
+   The browser's Back action consumes an actual navigation entry. We never call
+   preventDefault() on popstate (it cannot cancel a history navigation).
+   This script does not delete any PIC drafts or NCR offline queue records.
+*/
+(function installPICSmartBackV18_(){
+  'use strict';
+  const NAV_KEY = 'dklpoPicSmartBackV18';
+  const modalIds = ['detailModal','rectifyModal','annotatorModal','imgViewer','picHelpModal','picHelpResponseModal'];
+  const rootIsPic = () => !!($('mainApp') && $('mainApp').style.display === 'block');
+  const shown = id => !!($(id) && $(id).classList.contains('active'));
+  let entries = [];
+  let index = -1;
+  let seq = 0;
+  let suppressed = false;
+  let pendingCloseTimer = null;
+  let pendingRedirect = null;
+  let closedLayerSinceLastHistory_ = false;
+  let lastExitBackAt = 0;
+  let popQueue = Promise.resolve();
+  const original = {};
+
+  function capture(){
+    return {
+      pic:rootIsPic(),
+      adhoc:shown('pageAdhocV13'),
+      detail:shown('detailModal'),
+      rectify:shown('rectifyModal'),
+      annotator:shown('annotatorModal'),
+      viewer:shown('imgViewer'),
+      help:shown('picHelpModal'),
+      helpResponse:shown('picHelpResponseModal'),
+      findingId:currentFinding ? String(currentFinding.findingId || '') : '',
+      helpRequestId:typeof picHelpResponseId_ !== 'undefined' ? picHelpResponseId_ : '',
+      tab:activeTab,
+      station:activeStationFilter,
+      search:$('taskSearchInput')?.value || ''
+    };
+  }
+  function baseline(v){
+    return {...v,adhoc:false,detail:false,rectify:false,annotator:false,
+      viewer:false,help:false,helpResponse:false,search:'',tab:'action',station:'ALL'};
+  }
+  function signature(v){
+    // search text changes should not create an extra history entry for every key.
+    return JSON.stringify([v.pic,v.adhoc,v.detail,v.rectify,v.annotator,v.viewer,v.help,
+      v.helpResponse,v.findingId,v.helpRequestId,v.tab,v.station,v.search]);
+  }
+  function root(v){
+    return !v.adhoc && !v.detail && !v.rectify && !v.annotator && !v.viewer &&
+      !v.help && !v.helpResponse && v.tab==='action' && v.station==='ALL' && !v.search.trim();
+  }
+  function makeState(view,kind){
+    return { ...((history.state && typeof history.state === 'object') ? history.state : {}),
+      [NAV_KEY]: {id:++seq,kind:kind||'view',view:{...view}} };
+  }
+  function navState(){return history.state && history.state[NAV_KEY];}
+  function push(view,kind){
+    if(suppressed)return;
+    const current=entries[index]?.view;
+    if(kind!=='guard' && kind!=='restore-after-save-failure' && current && signature(current)===signature(view))return;
+    try{
+      const obj=makeState(view,kind);
+      history.pushState(obj,'');
+      entries=entries.slice(0,index+1);
+      entries.push(obj[NAV_KEY]);
+      index=entries.length-1;
+    }catch(err){console.warn('[PIC Back] Failed to save navigation:',err);}
+  }
+  function replace(view){
+    const old=navState();
+    if(!old || index<0)return;
+    try{
+      const obj={...history.state,[NAV_KEY]:{...old,view:{...view}}};
+      history.replaceState(obj,'');
+      entries[index]=obj[NAV_KEY];
+    }catch(err){console.warn('[PIC Back] Failed to update navigation:',err);}
+  }
+  function scheduleClose(){
+    if(suppressed)return;
+    if(pendingCloseTimer!==null)clearTimeout(pendingCloseTimer);
+    pendingCloseTimer=setTimeout(()=>{
+      pendingCloseTimer=null;
+      if(suppressed || index<1)return;
+      const now=capture();
+      const closed=closedLayerSinceLastHistory_;
+      closedLayerSinceLastHistory_=false;
+      const sameCurrent=signature(entries[index].view)===signature(now);
+      if(sameCurrent && !closed)return;
+      // If close + tab switch happened in one action, the tab now has a
+      // new history state but its ancestors are stale modal entries.
+      if(sameCurrent && closed){
+        let rootIndex=-1;
+        for(let i=index-1;i>=1;i--){if(root(entries[i].view) && !entries[i].view.adhoc){rootIndex=i;break;}}
+        if(rootIndex>=1){pendingRedirect=now;history.go(rootIndex-index);}
+        return;
+      }
+      // Find the nearest previous matching screen (e.g. rectify -> detail).
+      let backTo=-1;
+      for(let i=index-1;i>=1;i--){
+        if(signature(entries[i].view)===signature(now)){backTo=i;break;}
+      }
+      if(backTo>=1){history.go(backTo-index);return;}
+      // Several screens closed at once (e.g. successful PIC rectification).
+      // Return to root, then add ONE fresh state for the resulting screen.
+      let rootIndex=-1;
+      for(let i=index-1;i>=1;i--){if(root(entries[i].view) && !entries[i].view.adhoc){rootIndex=i;break;}}
+      if(rootIndex>=1){pendingRedirect=now;history.go(rootIndex-index);}
+      else replace(now);
+    },0);
+  }
+  function wrapOpen(name, visible){
+    const fn=window[name];
+    if(typeof fn!=='function')return;
+    original[name]=fn;
+    window[name]=function(...args){
+      // A fresh user opening a screen before a previous close has settled
+      // supersedes the pending close (prevents delayed pop from closing it).
+      if(pendingCloseTimer!==null){
+        clearTimeout(pendingCloseTimer);pendingCloseTimer=null;
+        closedLayerSinceLastHistory_=false;
+      }
+      const before=visible();
+      const result=fn.apply(this,args);
+      const after=()=>{if(!suppressed && !before && visible())push(capture(),name);};
+      if(result && typeof result.then==='function')return result.then(value=>{after();return value;});
+      after();return result;
+    };
+  }
+  function wrapClose(name){
+    const fn=window[name];
+    if(typeof fn!=='function')return;
+    original[name]=fn;
+    window[name]=function(...args){
+      const before=capture();
+      const result=fn.apply(this,args);
+      const after=()=>{
+        if(suppressed)return;
+        const afterView=capture();
+        if(signature(before)!==signature(afterView))closedLayerSinceLastHistory_=true;
+        scheduleClose();
+      };
+      if(result && typeof result.then==='function')return result.then(value=>{after();return value;});
+      after();return result;
+    };
+  }
+  function wrapTabAndStation(){
+    const origTab=window.switchTab, origStation=window.setStationFilter;
+    if(typeof origTab==='function'){
+      original.switchTab=origTab;
+      window.switchTab=function(tab,fromBack){
+        const changed=String(tab)!==String(activeTab);
+        const result=origTab(tab);
+        if(changed && !fromBack && !suppressed)push(capture(),'tab');
+        return result;
+      };
+    }
+    if(typeof origStation==='function'){
+      original.setStationFilter=origStation;
+      window.setStationFilter=function(station,fromBack){
+        const changed=(station||'ALL')!==activeStationFilter;
+        const result=origStation(station);
+        if(changed && !fromBack && !suppressed)push(capture(),'station');
+        return result;
+      };
+    }
+  }
+  async function apply(target){
+    suppressed=true;
+    try{
+      // Close only the layers which must disappear; saving PIC evidence is mandatory.
+      if(shown('annotatorModal')&&!target.annotator)original.closeAnnotator();
+      if(shown('imgViewer')&&!target.viewer)original.closeImgViewer();
+      if(shown('rectifyModal')&&!target.rectify){
+        await original.closeRectify(true);
+        if(shown('rectifyModal'))return false; // save failed: restore a history step
+      }
+      if(shown('picHelpResponseModal')&&!target.helpResponse)original.closePICHelpResponseModal_();
+      if(shown('picHelpModal')&&!target.help)original.closePICHelpModal_();
+      if(shown('detailModal')&&!target.detail)original.closeDetail();
+      if(shown('pageAdhocV13')&&!target.adhoc){
+        if(adhocBusyV13_||adhocSyncBusyV13_){
+          showToast('Penghantaran berjalan','Selesaikan penghantaran laporan dahulu.','info');
+          return false;
+        }
+        original.adhocCloseV13_();
+      }
+      // Restore tab, station and search from the prior browser history entry.
+      if(rootIsPic()){
+        if(target.tab && activeTab!==target.tab)original.switchTab(target.tab);
+        if((target.station||'ALL')!==activeStationFilter)original.setStationFilter(target.station);
+        const search=$('taskSearchInput');
+        if(search && search.value!==target.search){search.value=target.search||'';renderTab();}
+      }
+      // Browser Forward should also be able to re-open common screens.
+      if(target.adhoc&&!shown('pageAdhocV13'))original.adhocOpenV13_();
+      if(target.detail&&!shown('detailModal') && target.findingId)original.openDetail(target.findingId);
+      if(target.rectify&&!shown('rectifyModal') && target.findingId)await original.openRectify(target.findingId);
+      if(target.helpResponse&&!shown('picHelpResponseModal')&&target.helpRequestId)original.openPICHelpResponse_(target.helpRequestId);
+      if(target.help&&!shown('picHelpModal')&&target.findingId)original.picHelpOpenDialog_(target.findingId);
+      return true;
+    }catch(err){console.error('[PIC Back] Could not restore navigation:',err);return false;}
+    finally{suppressed=false;}
+  }
+  function announceExit(){
+    showToast(t('Tekan Kembali Sekali Lagi','Press Back Again'),
+      t('Tekan Back sekali lagi dalam 2.2 saat untuk keluar.','Press Back once more within 2.2 seconds to exit.'),'info');
+  }
+  async function handlePop(event){
+    const target=event.state && event.state[NAV_KEY];
+    if(!target)return; // External website: allow the browser to navigate normally.
+    const prevIndex=index;
+    const previous=entries[index]?.view||capture();
+    const found=entries.findIndex(x=>x.id===target.id);
+    if(found>=0)index=found;
+    const now=Date.now();
+    // Guard against accidentally closing the PWA at its home screen.
+    if(target.kind==='base' && root(previous)){
+      if(now-lastExitBackAt<2200){
+        lastExitBackAt=0;
+        // Current state is the base entry, so one more native Back can leave.
+        // Some installed PWAs have no earlier history entry; OS handles that.
+        history.back();
+      }else{
+        lastExitBackAt=now;
+        announceExit();
+        push(capture(),'guard');
+      }
+      return;
+    }
+    lastExitBackAt=0;
+    // Don't treat duplicate states (from earlier manual UI changes) as extra Back presses.
+    if(target.kind==='base'){
+      await apply(baseline(previous));
+      push(capture(),'guard');
+      return;
+    }
+    const restored=await apply(target.view);
+    if(!restored){push(previous,'restore-after-save-failure');return;}
+    if(pendingRedirect){
+      const desired=pendingRedirect;pendingRedirect=null;
+      await apply(desired);
+      push(capture(),'completed-action');
+    }
+    // Explicitly leave the native browser history pointer at this entry.
+  }
+
+  // Assign each old function only once; wrappers are installed after all app scripts.
+  wrapTabAndStation();
+  wrapOpen('openDetail',()=>shown('detailModal'));
+  wrapOpen('openRectify',()=>shown('rectifyModal'));
+  wrapOpen('openAnnotator',()=>shown('annotatorModal'));
+  wrapOpen('viewImg',()=>shown('imgViewer'));
+  wrapOpen('picHelpOpenDialog_',()=>shown('picHelpModal'));
+  wrapOpen('openPICHelpResponse_',()=>shown('picHelpResponseModal'));
+  wrapOpen('adhocOpenV13_',()=>shown('pageAdhocV13'));
+  ['closeAnnotator','closeImgViewer','closeRectify','closePICHelpResponseModal_',
+    'closePICHelpModal_','closeDetail','adhocCloseV13_'].forEach(wrapClose);
+
+  // Track the first nonempty search as one reversible state, not a state per letter.
+  $('taskSearchInput')?.addEventListener('input',()=>{
+    if(suppressed || !rootIsPic())return;
+    const now=capture(),prior=entries[index]?.view;
+    if(!prior)return;
+    if(!prior.search && now.search)push(now,'search');
+    else if(prior.search!==now.search){
+      if(!now.search)scheduleClose();
+      else replace(now);
+    }
+  });
+
+  const initial=capture();
+  const initialReport=initial.adhoc;
+  const initialRoot=baseline(initial);
+  try{
+    const base=makeState(initialRoot,'base');
+    history.replaceState(base,'');entries=[base[NAV_KEY]];index=0;
+    const guard=makeState(initialRoot,'guard');
+    history.pushState(guard,'');entries.push(guard[NAV_KEY]);index=1;
+    if(initialReport)push(initial,'report');
+  }catch(err){console.warn('[PIC Back] History API unavailable:',err);}
+
+  // Automatic login/entry changes the root view without making a Back exit.
+  const launchOriginal=window.launch;
+  if(typeof launchOriginal==='function'){
+    window.launch=function(...args){
+      const value=launchOriginal.apply(this,args);
+      if(!suppressed && root(capture()))replace(capture());
+      return value;
+    };
+  }
+  window.addEventListener('popstate',event=>{
+    if(pendingCloseTimer!==null){clearTimeout(pendingCloseTimer);pendingCloseTimer=null;closedLayerSinceLastHistory_=false;}
+    popQueue=popQueue.then(()=>handlePop(event)).catch(err=>console.warn('[PIC Back] Navigation failed:',err));
+  });
+  window.dklpoSmartBackV18={version:'v18',getState:()=>({index,history:entries.map(x=>({kind:x.kind,view:x.view})),current:capture()})};
+})();
 
 </script>
 </body>
