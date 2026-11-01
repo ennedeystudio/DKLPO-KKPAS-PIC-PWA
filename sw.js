@@ -1,59 +1,109 @@
-const CACHE_NAME = 'kkpas-pwa-v15-issue-action-20261030';
+const dklpoDbPool_ = new Map();
+function dklpoOpenDb_(name, version, stores) {
+  const key = name + ':' + version;
+  const existing = dklpoDbPool_.get(key);
+  if (existing) return existing.promise;
+  const entry = {db:null, promise:null};
+  entry.promise = new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = error => {
+      if (settled) return;
+      settled = true;
+      if (dklpoDbPool_.get(key) === entry) dklpoDbPool_.delete(key);
+      reject(error || new Error('IndexedDB unavailable'));
+    };
+    let request;
+    try { request = indexedDB.open(name, version); } catch (error) { fail(error); return; }
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const [store, keyPath] of Object.entries(stores)) {
+        if (!db.objectStoreNames.contains(store)) {
+          db.createObjectStore(store, keyPath ? {keyPath} : undefined);
+        }
+      }
+    };
+    request.onblocked = () => fail(new Error('IndexedDB upgrade blocked. Tutup tab portal lama dan cuba lagi.'));
+    request.onerror = () => fail(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      if (settled) { db.close(); return; }
+      settled = true;
+      entry.db = db;
+      const forget = () => { if (dklpoDbPool_.get(key) === entry) dklpoDbPool_.delete(key); };
+      db.onversionchange = () => { db.close(); forget(); };
+      db.onclose = forget;
+      resolve(db);
+    };
+  });
+  dklpoDbPool_.set(key, entry);
+  entry.promise.catch(() => { if (dklpoDbPool_.get(key) === entry) dklpoDbPool_.delete(key); });
+  return entry.promise;
+}
+function dklpoDbRequest_(db, store, mode, method, value, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, mode);
+    const target = tx.objectStore(store);
+    const request = method === 'getAll' ? target.getAll()
+      : method === 'put' && key !== undefined ? target.put(value, key)
+      : target[method](value);
+    let result;
+    request.onsuccess = () => { result = request.result; };
+    request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = tx.onabort = () => reject(tx.error || request.error || new Error('IndexedDB transaction aborted'));
+  });
+}
+
+const CACHE_PREFIX = 'kkpas-pic-' + encodeURIComponent(self.registration.scope) + '-';
+const CACHE_NAME = CACHE_PREFIX + 'r5';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
-const WEB_APP_URL = 'https://dklpo-pic-api.ennedeystudio.workers.dev'; // URL backend pilihan pengguna
-const DB_NAME = 'kkpas-offline-v1';
-const DB_VERSION = 3;
-const MAX_SYNC_ATTEMPTS = 5;
-const RETRY_DELAYS_MS = [60*1000, 5*60*1000, 15*60*1000, 60*60*1000, 6*60*60*1000];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all(APP_SHELL.map(url => cache.add(url).catch(err => { console.warn('KKPAS app shell unavailable:', url, err); return null; })))).catch(() => null));
-  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all(
+    APP_SHELL.map(url => cache.add(url).catch(() => null))
+  )).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('kkpas-pwa-') && key !== CACHE_NAME).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil(caches.keys().then(keys => Promise.all(
+    keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key))
+  )).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request).then(cached => cached || caches.match('./')))
-  );
+  if (url.origin !== self.location.origin || !url.href.startsWith(self.registration.scope)) return;
+  event.respondWith(fetch(request).then(response => {
+    if (response && response.ok) {
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => null));
+    }
+    return response;
+  }).catch(async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (request.mode === 'navigate') {
+      return await cache.match(new URL('./index.html', self.registration.scope).href)
+        || await cache.match(self.registration.scope) || Response.error();
+    }
+    return Response.error();
+  }));
 });
 
-function openDb_() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db=req.result;
-      if(!db.objectStoreNames.contains('drafts')) db.createObjectStore('drafts',{keyPath:'id'});
-      if(!db.objectStoreNames.contains('offlineQueue')) db.createObjectStore('offlineQueue',{keyPath:'id'});
-      if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv',{keyPath:'key'});
-    };
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror=()=>reject(req.error);
-  });
-}
+const WEB_APP_URL = 'https://dklpo-pic-api.ennedeystudio.workers.dev';  
+const DB_NAME = 'kkpas-offline-v1';
+const DB_VERSION = 3;
+const MAX_SYNC_ATTEMPTS = 5;
+const RETRY_DELAYS_MS = [60*1000, 5*60*1000, 15*60*1000, 60*60*1000, 6*60*60*1000];
 
-async function getAllQueue_(){const db=await openDb_();return new Promise((res,rej)=>{const tx=db.transaction('offlineQueue','readonly');const r=tx.objectStore('offlineQueue').getAll();r.onsuccess=()=>{const v=r.result||[];db.close();res(v)};r.onerror=()=>{const e=r.error;db.close();rej(e)}})}
-async function putQueue_(value){const db=await openDb_();return new Promise((res,rej)=>{const tx=db.transaction('offlineQueue','readwrite');tx.objectStore('offlineQueue').put(value);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{const e=tx.error;db.close();rej(e)}})}
-async function deleteQueue_(id){const db=await openDb_();return new Promise((res,rej)=>{const tx=db.transaction('offlineQueue','readwrite');tx.objectStore('offlineQueue').delete(id);tx.oncomplete=()=>{db.close();res()};tx.onerror=()=>{const e=tx.error;db.close();rej(e)}})}
+function openDb_() { return dklpoOpenDb_(DB_NAME, DB_VERSION, {drafts:'id',offlineQueue:'id',kv:'key'}); }
+
+async function getAllQueue_(value) { return await dklpoDbRequest_(await openDb_(), 'offlineQueue', 'readonly', 'getAll', value) || []; }
+async function putQueue_(value) { return await dklpoDbRequest_(await openDb_(), 'offlineQueue', 'readwrite', 'put', value); }
+async function deleteQueue_(value) { return await dklpoDbRequest_(await openDb_(), 'offlineQueue', 'readwrite', 'delete', value); }
 
 function syncError_(message, retryable=true, retryAfterMs=0){
   const err=new Error(String(message||'SYNC_FAILED'));
@@ -63,6 +113,7 @@ function syncError_(message, retryable=true, retryAfterMs=0){
 }
 
 async function formPost_(payload){
+  const edgeSession=await dklpoBackgroundSession_();
   const params=new URLSearchParams();
   Object.entries(payload||{}).forEach(([k,v])=>params.append(k,typeof v==='object'?JSON.stringify(v):String(v??'')));
   const controller = new AbortController();
@@ -72,7 +123,7 @@ async function formPost_(payload){
   try {
     response = await fetch(WEB_APP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization':'Bearer '+edgeSession.token },
       body: params,
       signal: controller.signal
     });
@@ -84,6 +135,7 @@ async function formPost_(payload){
   }
   let data=null;
   try{data=JSON.parse(text)}catch(_){throw syncError_('NON_JSON_RESPONSE',response.status>=500||response.status===429)}
+  if(response.status===401){const e=syncError_('EDGE_AUTH_REQUIRED',true);e.authRequired=true;await broadcast_({type:'DKLPO_EDGE_AUTH_REQUIRED'});throw e;}
   if(!response.ok||!data||!data.ok){
     const retryable=(data&&typeof data.retryable==='boolean')?data.retryable:(response.status===429||response.status>=500);
     const retryAfterMs=(data&&data.retryAfterMs)||0;
@@ -152,7 +204,7 @@ async function syncOne_(record){
   const legacy=Array.isArray(record.uploadedPhotoUrls)?record.uploadedPhotoUrls:[];
   const uploaded=[];
 
-  // Map receipts by stable image ID. Never assume image indexes stayed unchanged.
+   
   for(let i=0;i<photos.length;i++){
     const ph=photos[i];
     const stableId=String(ph&&ph.id!=null?ph.id:`legacy-${i+1}`).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,70);
@@ -160,12 +212,12 @@ async function syncOne_(record){
     let receipt=map[uploadKey];
     if(!receipt && !record.uploadedPhotoMap && legacy[i] && legacy[i].url) receipt=legacy[i];
     if(!receipt || !receipt.url){
-      const r=await formPost_({action:'uploadPhoto',teamCode:record.payload.teamCode,uploadKey,month:record.payload.month,station:record.payload.station,inspectorName:record.payload.inspectorName,base64:ph.data,comment:ph.comment||'',index:i+1,filename:ph.filename||`photo_${i+1}.jpg`});
+      const r=await formPost_({action:'uploadPhoto',inspectorAuth:record.payload.inspectorAuth||record.payload.inspectorToken||'',teamCode:record.payload.teamCode,uploadKey,month:record.payload.month,station:record.payload.station,inspectorName:record.payload.inspectorName,base64:ph.data,comment:ph.comment||'',index:i+1,filename:ph.filename||`photo_${i+1}.jpg`});
       if(!r||!r.url) throw syncError_('UPLOAD_MISSING_URL',true);
       receipt={url:r.url,fileId:r.fileId||'',resourceKey:r.resourceKey||''};
       map[uploadKey]=receipt;
       record.uploadedPhotoMap=map;
-      await putQueue_(record); // checkpoint immediately after each successful upload
+      await putQueue_(record);  
     }
     uploaded.push({...receipt,comment:ph.comment||'',findingKey:ph.findingKey||'',index:i+1,reviewAnalysis:ph.reviewAnalysis||null,reviewAccepted:ph.reviewAccepted||null,reviewedAt:ph.reviewedAt||''});
   }
@@ -189,10 +241,12 @@ async function processQueue_(){
     if(row.status==='DIRECT_SENDING'&&Number(row.leaseUntil||0)>Date.now()){
       skipped++;needsRetry=true;continue;
     }
+    const previousAttempts=Number(row.attempts||0);
     try{
       const result=await syncOne_(row);
       if(result&&result.ok)synced++;else skipped++;
     }catch(e){
+      if(e.authRequired){row.attempts=previousAttempts;row.status='AUTH_REQUIRED';row.nextAttemptAt='';row.lastError=String(e.message);await putQueue_(row);skipped++;needsRetry=true;continue;}
       failed++;
       row.lastError=String(e&&e.message?e.message:e);
       row.lastErrorAt=new Date().toISOString();
@@ -212,12 +266,12 @@ async function processQueue_(){
         await broadcast_({type:'KKPAS_SYNC_ERROR',station:row.payload&&row.payload.station,error:row.lastError,attempts:row.attempts,nextAttemptAt:row.nextAttemptAt});
         needsRetry=true;
       }
-      // Important: continue with the next inspection instead of blocking the whole queue.
+       
     }
   }
   const summary={synced,failed,dead,skipped};
-  // Background Sync should remain pending when retryable records still exist.
-  // We processed every eligible row first, so one bad row never blocks the rest.
+   
+   
   if(needsRetry){const err=new Error('KKPAS_QUEUE_RETRY_PENDING');err.summary=summary;throw err;}
   return summary;
 }
@@ -249,3 +303,17 @@ async function showMonthEndReminder_(){
 
 self.addEventListener('periodicsync',event=>{if(event.tag==='kkpas-month-end-reminder')event.waitUntil(showMonthEndReminder_().catch(()=>null))});
 self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(cs=>{for(const c of cs){if('focus'in c)return c.focus()}return self.clients.openWindow('./')}))});
+
+async function dklpoBackgroundSession_(){
+  const session = (await dklpoDbRequest_(await openDb_(), 'kv', 'readonly', 'get', 'dklpo_edge_background_v1'))?.session || null;
+  if(!session?.token||Number(session.expiresAt)<=Date.now()+5000){
+    const error=syncError_('EDGE_AUTH_REQUIRED: Buka portal untuk memperbaharui sesi.',true);error.authRequired=true;
+    await broadcast_({type:'DKLPO_EDGE_AUTH_REQUIRED'});throw error;
+  }return session;
+}
+self.addEventListener('message',event=>{
+  if(event.data?.type!=='DKLPO_EDGE_BACKGROUND_SESSION')return;
+   
+  const session=event.data.session;if(!session?.token||!Number.isFinite(Number(session.expiresAt)))return;
+  event.waitUntil((async()=>{await dklpoDbRequest_(await openDb_(), 'kv', 'readwrite', 'put', {key:'dklpo_edge_background_v1',session});await runQueueOnce_().catch(()=>null);})());
+});
