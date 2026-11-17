@@ -1827,6 +1827,7 @@ async function adhocReviewAiV13_(ph,btn){
 }
 function adhocPayloadV13_(){return{
   reporterName:adhocGetV13_('adhocReporterV13').value.trim(),station:adhocGetV13_('adhocStationV13').value,
+  month:['January','February','March','April','May','June','July','August','September','October','November','December'][new Date().getMonth()],
   type:adhocGetV13_('adhocTypeV13').value,severity:adhocGetV13_('adhocSeverityV13').value,
   itemKey:adhocGetV13_('adhocItemV13').value.trim(),issueAction:adhocGetV13_('adhocActionV13').value.trim(),
   rootCause:adhocGetV13_('adhocRootV13').value.trim(),dueDate:adhocGetV13_('adhocDueV13').value,
@@ -1853,7 +1854,7 @@ async function adhocSendNowV13_(record,button){
     if(!receipt||!receipt.fileId){
       if(button)button.textContent='⏳ Gambar '+(i+1)+'/'+photos.length;
       const r=await adhocPostV13_({action:'uploadAdhocFindingPhoto',reporterName:record.payload.reporterName,
-        station:record.payload.station,month:['January','February','March','April','May','June','July','August','September','October','November','December'][new Date(record.createdAt||Date.now()).getMonth()],
+        station:record.payload.station,month:record.payload.month||['January','February','March','April','May','June','July','August','September','October','November','December'][new Date(record.createdAt||Date.now()).getMonth()],
         index:i+1,base64:photo.data,comment:photo.comment||'',uploadKey:key});
       if(!r.fileId)throw Error('Pelayan tidak mengembalikan ID gambar');
       receipt={fileId:r.fileId};receiptMap[key]=receipt;record.uploadedPhotoMap=receiptMap;
@@ -1874,7 +1875,7 @@ async function adhocSubmitV13_(){
   try{
     localStorage.setItem('dklpo_adhoc_reporter_v13',payload.reporterName);
     let record=await adhocTxV13_('readonly','get',payload.clientSubmissionId);
-    record=record?.type==='ADHOC_V13'?record:{id:payload.clientSubmissionId,type:'ADHOC_V13',payload,
+    record=record?.type==='ADHOC_V13'&&record.status!=='EDITING'?record:{id:payload.clientSubmissionId,type:'ADHOC_V13',payload,
       createdAt:new Date().toISOString(),photos:adhocPhotosV13_.map(x=>({...x})),uploadedPhotoMap:{},status:'QUEUED',attempts:0,nextAttemptAt:'',lastError:''};
     if(!navigator.onLine){await adhocTxV13_('readwrite','put',record);
       adhocToastV13_('Tiada Internet. Laporan selamat disimpan di peranti. Gunakan Butang Cuba Hantar apabila online.','info');
@@ -1890,7 +1891,7 @@ async function adhocSubmitV13_(){
       record.leaseUntil=0;record.lastError=String(e?.message||e);record.lastErrorAt=new Date().toISOString();
       record.status=adhocLikelyPermanentV13_(e)?'DEAD_LETTER':'QUEUED';record.nextAttemptAt='';
       await adhocTxV13_('readwrite','put',record);
-      if(record.status==='DEAD_LETTER')throw Error('Pelayan menolak laporan: '+record.lastError+' (semak dalam Laporan Tertangguh).');
+      if(['DEAD_LETTER','EDITING'].includes(record.status))throw Error('Pelayan menolak laporan: '+record.lastError+' (semak dalam Laporan Tertangguh).');
       adhocToastV13_('Pelayan belum mengesahkan laporan. Laporan tersimpan untuk cubaan semula.','info');
       adhocClearV13_(true);return;
     }
@@ -1923,7 +1924,7 @@ async function adhocSyncQueuedV13_(){
     const rows=await adhocReviewQueueV13_(false);
     const button=adhocGetV13_('adhocSubmitV13');
     for(const record of rows){
-      if(record.status==='DEAD_LETTER')continue;
+      if(['DEAD_LETTER','EDITING'].includes(record.status))continue;
       if(record.status==='DIRECT_SENDING'&&Number(record.leaseUntil||0)>Date.now())continue;
       record.status='DIRECT_SENDING';record.leaseUntil=Date.now()+240000;
       await adhocTxV13_('readwrite','put',record);
@@ -2244,5 +2245,214 @@ if(new URLSearchParams(location.search).get('report')==='adhoc'){
 })();
 
 </script>
+
+<script>
+/*! © Ennedey 2026. Transient errors retain PIC evidence for retry. */
+const dklpoPicFetchOriginal_=dklpoSecureFetch_;
+dklpoSecureFetch_=async function(url,options={}){
+ if(options.signal)return dklpoPicFetchOriginal_.call(this,url,options);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),95000);
+ try{return await dklpoPicFetchOriginal_.call(this,url,{...options,signal:controller.signal});}finally{clearTimeout(timer);}
+};
+const dklpoPicApiOriginal_=api;
+api=async function(payload){
+ const result=await dklpoPicApiOriginal_.apply(this,arguments);
+ if(result?.ok===false&&(result.retryable===true||/SERVER_BUSY|RATE_LIMIT|BACKEND_UNAVAILABLE|GATEWAY_FAILURE|EDGE_.*(?:SESSION|AUTH)|PIC_SESSION|CHALLENGE_|TOKEN_EXPIRED/i.test(String(result.error||''))))return {...result,networkError:true};
+ return result;
+};
+</script>
+<script>
+/*! © Ennedey 2026. Bounded uploads: preserve order and await in-flight work. */
+async function dklpoUploadPool_(items,limit,job){
+ const result=new Array(items.length);let cursor=0,failed=null;
+ async function worker(){while(!failed){const i=cursor++;if(i>=items.length)return;try{result[i]=await job(items[i],i);}catch(e){if(!failed)failed=e;}}}
+ await Promise.all(Array.from({length:Math.min(Math.max(1,Number(limit)||1),2,items.length)},worker));
+ if(failed)throw failed;return result;
+}
+function dklpoUploadTransient_(e){return e?.retryable===true||e?.networkError===true||/RATE_LIMIT|SERVER_BUSY|BACKEND_UNAVAILABLE|GATEWAY_FAILURE|429|timeout|Failed to fetch|NetworkError/i.test(String(e?.message||e?.error||''));}
+const dklpoUxProgress_=new Map();
+let dklpoUxProgressDismissed_=false;
+function dklpoShowProgress_(id,phase,done=0,total=0){
+ if(typeof document==='undefined')return;
+ dklpoUxProgress_.set(id,{phase,done,total});
+ let panel=document.getElementById('dklpoUploadProgress');
+ if(!panel){panel=document.createElement('aside');panel.id='dklpoUploadProgress';panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');panel.style.cssText='position:fixed;left:12px;right:12px;bottom:16px;z-index:980;max-width:560px;max-height:160px;overflow:auto;margin:auto;padding:12px 16px;border:1px solid #64748b;border-radius:12px;background:#0f172a;color:#f8fafc;box-shadow:0 8px 24px #0006;font:14px system-ui';document.body.append(panel);}
+ panel.replaceChildren();
+ const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Sembunyikan status / Hide status');close.style.cssText='float:right;margin-left:12px;background:transparent;color:inherit;border:0;font-size:22px;cursor:pointer';close.onclick=()=>{dklpoUxProgressDismissed_=true;panel.hidden=true;};panel.append(close);
+ for(const [key,v]of dklpoUxProgress_){const line=document.createElement('div');const lang=typeof inspectionLang!=='undefined'?inspectionLang:typeof currentLang!=='undefined'?currentLang:'ms';const en=lang==='en';const labels={saved:en?'Saved on device — awaiting submission':'Disimpan pada peranti — menunggu penghantaran',uploading:en?'Uploading photos':'Memuat naik gambar',submitting:en?'Awaiting server confirmation':'Menunggu pengesahan pelayan',success:en?'Submission confirmed by server':'Penghantaran disahkan pelayan',pending:en?'Pending — reopen this portal online to retry':'Masih menunggu — buka portal online untuk cuba semula',review:en?'Review required — evidence retained':'Perlu semakan — bukti dikekalkan'};line.textContent=(labels[v.phase]||v.phase)+(v.total?' '+v.done+'/'+v.total:'');panel.append(line);}
+ if(phase==='saved'||phase==='review')dklpoUxProgressDismissed_=false;
+ panel.hidden=dklpoUxProgressDismissed_;
+ if(phase==='success')setTimeout(()=>{const v=dklpoUxProgress_.get(id);if(v?.phase==='success'){dklpoUxProgress_.delete(id);if(!dklpoUxProgress_.size)panel.hidden=true;}},6500);
+}
+
+/*! © Ennedey 2026. PIC queue checkpoints merge atomically in IndexedDB. */
+queueSubmissionOffline=async function(finding,actionText,rootCause,readyPhotos){
+ const pic=selectedPic;if(!pic)return false;
+ try{
+  const legacy=await getFullOfflineQueue_(),db=await picDb_(),date=new Date(finding.createdDate||'');
+  const item={findingId:finding.findingId,station:finding.station||'PIC',month:finding.month||'',year:isNaN(date.getTime())?new Date().getFullYear():date.getFullYear(),picId:pic.picId,picName:pic.name,action:actionText,rectificationAction:actionText,rootCause,photos:readyPhotos.map((p,i)=>({tmpId:p.tmpId||'queued-'+i,dataUrl:p.url?'':p.dataUrl,url:p.url||'',comment:p.comment||'',annotated:!!p.annotated})),queuedAt:new Date().toISOString()};let saved;
+  await new Promise((resolve,reject)=>{const tx=db.transaction('queues','readwrite'),store=tx.objectStore('queues'),request=store.get('main');
+   request.onsuccess=()=>{try{const rows=Array.isArray(request.result)?request.result:legacy;if(rows.some(r=>String(r.findingId)===String(item.findingId)))throw Error('Bukti untuk isu ini sudah berada dalam queue.');rows.push(item);saved=rows;store.put(rows,'main');}catch(e){reject(e);tx.abort();}};
+   tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error||Error('PIC_QUEUE_WRITE_FAILED'));
+  });
+  try{localStorage.setItem('dklpo_pic_queue_index_v3',JSON.stringify(saved.map(r=>({findingId:r.findingId,picId:r.picId,picName:r.picName,needsReview:!!r.needsReview,lastError:r.lastError||'',queuedAt:r.queuedAt||''}))));}catch(e){console.warn('Queue is committed; index refresh pending:',e);}updateQueueBanner();return true;
+ }catch(e){picStorageError_(String(e.message||e));return false;}
+};
+async function dklpoPicQueueChange_(item,change){
+ const db=await picDb_();let saved;
+ await new Promise((resolve,reject)=>{
+  const tx=db.transaction('queues','readwrite'),store=tx.objectStore('queues'),request=store.get('main');
+  request.onsuccess=()=>{try{
+   const rows=request.result;if(!Array.isArray(rows))throw Error('PIC_QUEUE_UNAVAILABLE');
+   const i=rows.findIndex(r=>String(r.findingId)===String(item.findingId)&&String(r.picId)===String(item.picId)&&String(r.queuedAt||'')===String(item.queuedAt||''));
+   if(i<0)throw Error('PIC_QUEUE_CHANGED');
+   const next=change(rows[i]);if(next===false)rows.splice(i,1);else if(next)rows[i]=next;
+   saved=rows;store.put(rows,'main');
+  }catch(e){reject(e);tx.abort();}};
+  tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error||Error('PIC_QUEUE_WRITE_FAILED'));
+ });
+ try{localStorage.setItem('dklpo_pic_queue_index_v3',JSON.stringify(saved.map(r=>({findingId:r.findingId,picId:r.picId,picName:r.picName,needsReview:!!r.needsReview,lastError:r.lastError||'',queuedAt:r.queuedAt||''}))));}catch(e){console.warn('PIC queue index refresh pending:',e);}
+ updateQueueBanner();return saved;
+}
+processOfflineQueueInner_=async function(){
+ if(syncingOfflineQueue||!selectedPic)return;
+ syncingOfflineQueue=true;const picId=String(selectedPic.picId),btn=$('btnSyncNow');let successes=0;
+ if(btn){btn.disabled=true;btn.textContent='⏳ Syncing...';}
+ const samePic=()=>{if(String(selectedPic?.picId)!==picId){const e=Error('PIC_SESSION_CHANGED');e.networkError=true;throw e;}};
+ try{
+  const rows=await getFullOfflineQueue_(),mine=rows.filter(r=>String(r.picId)===picId&&!r.needsReview);if(!mine.length)return;
+  samePic();const fresh=await api({action:'getPICFindings',picId,deviceId:getDeviceId()});
+  if(!fresh?.ok||!Array.isArray(fresh.findings))throw Error(fresh?.error||'PIC_STATUS_UNAVAILABLE');samePic();applyFreshPICProfile_(fresh);
+  for(const item of mine){
+   samePic();const latest=fresh.findings.find(r=>String(r.findingId)===String(item.findingId));
+   if(!latest||classifyStatus(latest)!=='action'||!canActOnFinding_(latest,selectedPic)){
+    await dklpoPicQueueChange_(item,r=>({...r,needsReview:true,lastError:'Tugasan ditutup, berubah atau di luar stesen PIC.'}));dklpoShowProgress_(item.findingId,'review');continue;
+   }
+   let completed=0,writes=Promise.resolve();const photos=item.photos||[];
+   const checkpoint=(i,url)=>{writes=writes.then(()=>dklpoPicQueueChange_(item,r=>{if(!r.photos?.[i])throw Error('PIC_QUEUE_CHANGED');const next={...r,photos:r.photos.map((ph,n)=>n===i?{...ph,url,dataUrl:''}:ph)};return next;}));return writes;};
+   try{
+    dklpoShowProgress_(item.findingId,'uploading',0,photos.length);
+    const uploaded=await dklpoUploadPool_(photos,item.uploadConcurrency===1?1:2,async(ph,i)=>{
+     samePic();let url=ph.url;
+     if(!url){if(!ph.dataUrl)throw Error('Gambar offline tiada. Jangan padam data peranti.');
+      const up=await api({action:'uploadPICPhoto',findingId:item.findingId,base64:ph.dataUrl,station:item.station||'PIC',inspectorName:(item.picName||'PIC')+' (PIC)',month:item.month||'',year:item.year||new Date().getFullYear(),index:i+1,comment:ph.comment||'',uploadKey:'PIC-'+item.findingId+'-'+(ph.tmpId||i)+(ph.annotated?'-m':'')});
+      if(!up?.ok||!up.url){const e=Error(up?.error||'UPLOAD_RECEIPT_MISSING');e.networkError=up?.networkError===true||up?.retryable===true;e.retryable=e.networkError;throw e;}url=up.url;
+      await checkpoint(i,url);ph.url=url;ph.dataUrl='';
+     }
+     dklpoShowProgress_(item.findingId,'uploading',++completed,photos.length);return {url,comment:ph.comment||''};
+    });await writes;samePic();dklpoShowProgress_(item.findingId,'submitting',completed,photos.length);
+    const result=await api({action:'submitPICRectification',findingId:item.findingId,picId:item.picId,picName:item.picName,rectificationAction:item.rectificationAction||item.action,rootCause:item.rootCause,photos:uploaded,deviceId:getDeviceId()});
+    if(!result?.ok){const e=Error(result?.error||'SUBMISSION_FAILED');e.networkError=result?.networkError===true||result?.retryable===true;throw e;}
+    await dklpoPicQueueChange_(item,()=>false);await clearSavedDraft(item.findingId);successes++;dklpoShowProgress_(item.findingId,'success',completed,photos.length);
+   }catch(e){
+    const transient=dklpoUploadTransient_(e)||e.networkError===true;
+    await dklpoPicQueueChange_(item,r=>({...r,uploadConcurrency:transient?1:r.uploadConcurrency,needsReview:!transient,lastError:String(e.message||e)})).catch(err=>console.warn('Queue retained:',err));
+    dklpoShowProgress_(item.findingId,transient?'pending':'review',completed,photos.length);
+   }
+  }
+ }catch(e){showToast(t('Sync Ditangguhkan','Sync Deferred'),String(e.message||e)+' — '+t('Bukti dikekalkan.','Evidence retained.'),'info');}
+ finally{syncingOfflineQueue=false;if(btn){btn.disabled=false;btn.textContent='🔄 Sync';}updateQueueBanner();}
+ if(successes&&String(selectedPic?.picId)===picId)await refreshAll({silent:true});
+};
+// Save the complete evidence queue before giving the form back to the user.
+submitRectification=async function(){
+ if(uploading)return;const f=currentFinding;if(!f||!selectedPic)return;
+ if(isFindingInOfflineQueue(f.findingId)){reviewOfflineQueue();return;}
+ const action=$('rectAction').value.trim(),cause=$('rectRootCause').value.trim(),ready=rectificationPhotos.filter(p=>p.status==='ready'||p.status==='done');
+ if(!action){showToast(t('Medan Wajib','Required Field'),t('Isi tindakan pembetulan.','Enter corrective action details.'),'error');return;}
+ if(!ready.length||rectificationPhotos.some(p=>p.status==='compressing')){showToast(t('Semak Gambar','Check Photos'),t('Tunggu gambar selesai diproses dan sertakan sekurang-kurangnya satu gambar.','Wait for processing and include at least one photo.'),'info');return;}
+ uploading=true;const btn=$('btnSubmitRect');if(btn)btn.disabled=true;
+ try{
+  if(!await queueSubmissionOffline(f,action,cause,ready))return;
+  dklpoShowProgress_(f.findingId,'saved',0,ready.length);uploading=false;
+  await closeRectify(false);closeDetail();renderTab();
+  showToast(t('Disimpan pada Peranti','Saved on Device'),t('Menunggu penghantaran dan pengesahan pelayan.','Awaiting submission and server confirmation.'),'info');
+  if(navigator.onLine)processOfflineQueue().catch(e=>console.warn('PIC queue pending:',e));
+ }catch(e){showToast(t('Belum Disimpan','Not Saved'),String(e.message||e),'error');}
+ finally{uploading=false;if(btn)btn.disabled=false;}
+};
+
+</script>
+<script>
+/*! UX-2: early device storage warning and coordinated safe PWA activation. */
+let dklpoStorageCheckAt_=0,dklpoUpdateHold_=false;
+async function dklpoStorageEstimate_(force=false){
+ if(!navigator.storage?.estimate||!force&&Date.now()-dklpoStorageCheckAt_<30000)return null;
+ dklpoStorageCheckAt_=Date.now();try{
+  const value=await navigator.storage.estimate(),usage=Number(value.usage||0),quota=Number(value.quota||0);
+  if(!quota)return null;const available=quota-usage,low=usage/quota>=0.8||available<30*1024*1024;
+  let el=document.getElementById('dklpoStorageWarning');
+  if(low&&!el){el=document.createElement('aside');el.id='dklpoStorageWarning';el.setAttribute('role','alert');el.style.cssText='position:fixed;top:8px;left:10px;right:10px;max-width:620px;margin:auto;z-index:1900;background:#78350f;color:#fff;padding:12px;border:1px solid #fbbf24;border-radius:10px;font:14px system-ui';document.body.append(el);}
+  if(el){el.hidden=!low;el.textContent='Ruang storan peranti hampir penuh ('+Math.max(0,Math.round(available/1048576))+' MB berbaki). Hantar laporan tertangguh apabila ada internet. Jangan padam data aplikasi sebelum semua laporan disahkan diterima.';}
+  return {low,available,usage,quota};
+ }catch{return null;}
+}
+async function dklpoSafeToUpdate_(){
+ if(typeof isSubmitting!=='undefined'&&isSubmitting||typeof syncingOfflineQueue!=='undefined'&&syncingOfflineQueue||typeof adhocBusyV13_!=='undefined'&&adhocBusyV13_||window.dklpoInPageSyncActive_)return false;
+ if(typeof currentStation!=='undefined'&&currentStation&&typeof hasSubmittedCurrent!=='undefined'&&!hasSubmittedCurrent)return false;
+ if(typeof dklpoBrowserSending_!=='undefined'&&dklpoBrowserSending_.size)return false;
+ try{
+  if(typeof idbGetAll_==='function'){
+   if((await idbGetAll_('offlineQueue')).length)return false;
+   if((await idbGetAll_('drafts')).length)return false;
+  }
+  if(typeof picDb_==='function'&&(await dklpoDbRequest_(await picDb_(),'drafts','readonly','getAll')).length)return false;
+  if(typeof getFullOfflineQueue_==='function'&&(await getFullOfflineQueue_()).length)return false;
+  if(typeof adhocTxV13_==='function'&&(await adhocTxV13_('readonly','getAll')).some(r=>r?.type==='ADHOC_V13'))return false;
+  if(document.querySelector('dialog[open],.modal.active,.modal.show,[aria-modal="true"]'))return false;
+  if(typeof adhocPhotosV13_!=='undefined'&&adhocPhotosV13_.length)return false;
+  // Unsaved typed text/files also holds an update until the user finishes.
+  if([...document.querySelectorAll('textarea,input[type="file"]')].some(e=>e.getClientRects().length&&(e.type==='file'?e.files?.length:String(e.value||'').trim())))return false;
+  return true;
+ }catch{return false;}
+}
+function dklpoReleaseUpdateHold_(){dklpoUpdateHold_=false;document.body.inert=false;}
+async function dklpoInitUpdate_(){
+ dklpoStorageEstimate_(true);if(!('serviceWorker'in navigator))return;
+ const reg=await navigator.serviceWorker.getRegistration();if(!reg)return;
+ let requested=false;
+ let button=document.getElementById('dklpoSafeUpdate');if(!button){button=document.createElement('button');button.id='dklpoSafeUpdate';button.type='button';button.hidden=true;button.textContent='Kemas kini aplikasi tersedia';button.style.cssText='position:fixed;right:12px;top:70px;z-index:1899;padding:12px;border:0;border-radius:10px;background:#0369a1;color:white';document.body.append(button);}
+ async function refresh(){button.hidden=!reg.waiting||!navigator.serviceWorker.controller||!await dklpoSafeToUpdate_();}
+ button.onclick=async()=>{if(!reg.waiting||!await dklpoSafeToUpdate_())return;requested=true;button.disabled=true;reg.waiting.postMessage({type:'DKLPO_SAFE_UPDATE'});setTimeout(()=>{if(requested){requested=false;button.disabled=false;dklpoReleaseUpdateHold_();refresh();}},12000);};
+ reg.addEventListener('updatefound',()=>{const sw=reg.installing;sw?.addEventListener('statechange',()=>{if(sw.state==='installed')refresh();});});
+ navigator.serviceWorker.addEventListener('message',async e=>{
+  if(e.data?.type==='DKLPO_UPDATE_PROBE'){
+   const safe=await dklpoSafeToUpdate_();if(safe){dklpoUpdateHold_=true;document.body.inert=true;setTimeout(dklpoReleaseUpdateHold_,10000);}
+   e.ports?.[0]?.postMessage({safe});
+  }
+  if(e.data?.type==='DKLPO_UPDATE_BLOCKED'){requested=false;button.disabled=false;dklpoReleaseUpdateHold_();refresh();}
+ });
+ navigator.serviceWorker.addEventListener('controllerchange',async()=>{if(dklpoUpdateHold_||requested){location.reload();}else refresh();});
+ setInterval(refresh,5000);await refresh();
+}
+document.addEventListener('DOMContentLoaded',()=>{dklpoInitUpdate_().catch(()=>{});setInterval(()=>dklpoStorageEstimate_(),60000);});
+document.addEventListener('change',e=>{if(e.target?.matches('input[type="file"]'))dklpoStorageEstimate_(true);},true);
+document.addEventListener('click',e=>{if(e.target?.closest('input[type="file"],button'))dklpoStorageEstimate_();},true);
+
+</script>
+
+<script>
+/*! UX-2: Ad-Hoc retry and reopen for PIC; retain original evidence until resubmission. */
+async function dklpoRecoverPicAdhoc_(id){
+ try{
+  const rows=await adhocTxV13_('readonly','getAll'),row=rows.find(r=>r.id===id);
+  if(!row||!['DEAD_LETTER','EDITING'].includes(row.status)||Number(row.leaseUntil)>Date.now())return;
+  if(adhocPhotosV13_.length&&!confirm('Buka laporan gagal ini? Simpan laporan semasa dahulu jika masih diperlukan.'))return;
+  if(adhocPhotosV13_.length)throw Error('Simpan laporan semasa dahulu sebelum membuka rekod lain.');
+  const p=row.payload||{};
+  row.status='EDITING';row.leaseUntil=0;await adhocTxV13_('readwrite','put',row);
+  adhocOpenV13_();
+  const fields={adhocReporterV13:p.reporterName,adhocStationV13:p.station,adhocTypeV13:p.type,adhocSeverityV13:p.severity,adhocItemV13:p.itemKey,adhocActionV13:p.issueAction||p.action,adhocRootV13:p.rootCause,adhocDueV13:p.dueDate};
+  for(const [key,value]of Object.entries(fields)){const el=document.getElementById(key);if(el)el.value=value||'';}
+  adhocIdV13_=row.id;adhocPhotosV13_=structuredClone(row.photos||[]);adhocGpsV13_=null;adhocRenderV13_();
+  adhocToastV13_('Bukti dan catatan dipulihkan. Semak maklumat dan rekod GPS baharu sebelum menghantar.');
+ }catch(e){adhocToastV13_(String(e.message||e),'error');}
+}
+const dklpoPicReviewBeforeRecovery_=adhocReviewQueueV13_;
+adhocReviewQueueV13_=async function(){const rows=await dklpoPicReviewBeforeRecovery_.apply(this,arguments);const root=document.getElementById('adhocQueueStatusV13');if(root){
+ for(const row of rows||[]){if(!['DEAD_LETTER','EDITING'].includes(row.status))continue;const b=document.createElement('button');b.type='button';b.textContent='Buka Semula dalam Borang — '+row.payload?.station;b.onclick=()=>dklpoRecoverPicAdhoc_(row.id);root.append(document.createElement('br'),b);}
+}return rows;};
+</script>
+
 </body>
 </html>
